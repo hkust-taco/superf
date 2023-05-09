@@ -9,60 +9,28 @@
   <h1>MLscript demonstration</h1>
   <div id="content">
     <textarea id="mlscript-input" class="panel" spellcheck="false">
-class Left[A]: { value: A }
-def Left value = Left{ value }
+class List[A]
+  method Fold: (() -> 'b, (A, List[A]) -> 'b) -> 'b
+class Nil[A]: List[A]
+  method Fold(f, _) = f()
+class Cons[A]: List[A] & { head: A; tail: List[A] }
+  method Fold(_, f) = f(this.head, this.tail)
 
-class Right[A]: { value: A }
-def Right value = Right{ value }
+def nil = Nil {} : List['a]
+def cons(head, tail) = Cons { head; tail } : List['a]
 
-def testVal = if true then Left 1 else Right 2
-def res = case testVal of
-  { Left -> testVal.value
-  | Right -> 1
-  }
+rec def find(table, key) =
+  table.Fold(
+    fun () -> undefined,
+    fun (h, t) -> if eq h.key key then h.val else find(t, key))
 
-def zero = 0
-def bruh = "Bruh"
-def two = add 1 zero
-def lambda = fun x -> x
-def simpleLet = let i = 0 in add i 1
+ls = cons({key="I"; val=id}, cons({key="omega"; val=fun x -> x x}, nil))
 
-def f: (int & 'a) -> (int & 'a) -> 'a
-def f a b = if gt a b then a else b
+res = find(ls, "omega")
 
-f 1 2
+case res of undefined -> "???", _ -> res id "!"
 
-def test x = case x of
-  { Left -> x.value
-  | Right -> "nope"
-  }
-
-def tmp = test (if true then Left 1 else Right 2)
-
-case tmp of { int -> tmp | string -> 0 }
-
-def test2 x = case x of
-  { int -> x
-  | bool -> x
-  | string -> x
-  }
-test2 1
-test2 true
-test2 "a"
-
-def test3 x = case x of
-  { 1 -> true
-  | true -> true
-  | "a" -> true
-  | _ -> false
-  }
-test3 1
-test3 true
-test3 "a"
-test3 2
-test3 false
-test3 "oops"
-test3 {}
+find(ls, "oops")
 </textarea>
 <!-- let rec recursive_monster = fun x ->
   { thing = x;
