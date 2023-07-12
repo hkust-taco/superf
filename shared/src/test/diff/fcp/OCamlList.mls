@@ -5,7 +5,7 @@
 
 
 
-// *** Signatures of required definitions ***
+// *** 1. Signatures of required definitions ***
 
 
 // `compare` and (=) in OCaml are polymorphic
@@ -85,7 +85,7 @@ type Seq[A] = unit -> Node[A]
 
 
 
-// *** Signatures ported from List.mli ***
+// *** 2. Signatures ported from List.mli ***
 
 
 def length: List['a] -> int
@@ -285,7 +285,7 @@ def of_seq: Seq['a] -> List['a]
 
 
 
-// *** Implementations ported from List.ml ***
+// *** 3. Implementations ported from List.ml ***
 
 
 rec def length_aux len = fun x -> match x with
