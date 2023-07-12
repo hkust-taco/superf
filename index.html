@@ -9,7 +9,7 @@
   <h1>SuperF online demonstration</h1>
   <div id="content">
     <textarea id="mlscript-input" class="panel" spellcheck="false">
-datatype Option[A] = Some(A,) || None
+datatype Option[A] = Some(A) | None
 
 def foo f = (f 123, f true)
 fooid = foo id
@@ -19,7 +19,7 @@ def bar f = (f (fun x -> x), f (fun x -> Some x))
 test = bar foo
 
 
-datatype List[A] = Cons(A, List[A]) || Nil
+datatype List[A] = Cons(A, List[A]) | Nil
 
 rec def find(table, key) =
   match table with
