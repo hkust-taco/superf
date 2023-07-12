@@ -50,6 +50,7 @@ object Main {
             case Some(typeCheckResult) => typeCheckResult
             case None => {
               val htmlBuilder = new StringBuilder
+              /* 
               var results = generateRuntimeCode(pgrm) match {
                 case R(code) =>
                   executeCode(code) match {
@@ -62,18 +63,20 @@ object Main {
                   htmlBuilder ++= errorHtml
                   Nil
               }
+              */
               htmlBuilder ++= """<table>
                   |  <thead>
                   |    <tr>
                   |       <td>Name</td>
                   |       <td>Type</td>
-                  |       <td>Value</td>
                   |    </tr>
                   |  </thead>
                   |""".stripMargin
+                  // |       <td>Value</td>
               // Assemble something like: `val <name>: <type> = <value>`.
               // If error occurred, leave `<no value>`.
               typeCheckResult.zip(pgrm.desugared._2._2) foreach { case ((name, ty), origin) =>
+                /* 
                 val value = origin match {
                   // Do not extract from results if its a type declaration.
                   case Def(_, _, R(_), _) => N
@@ -89,6 +92,8 @@ object Main {
                   case S(text) => s"<td>$text</td>"
                   case N => "<td class=\"no-value\">no value</td>"
                 }
+                */
+                val valueHtml = ""
                 htmlBuilder ++= s"""<tr>
                   |  <td class="name">${name getOrElse "res"}</td>
                   |  <td class="type">$ty</td>
@@ -168,7 +173,10 @@ object Main {
       dbg = false,
       verbose = false,
       explainErrors = false
-    )
+    ) {
+      override def recordTypeVars = true
+    }
+    typer.noRecursiveTypes = true
     
     import typer._
     
@@ -202,11 +210,11 @@ object Main {
     val curBlockTypeDefs = typeDefs.flatMap(td => ctx.tyDefs.get(td.nme.name))
     typer.computeVariances(curBlockTypeDefs, ctx)
     
-    def getType(ty: typer.SimpleType): Type = {
+    def getType(ty: typer.SimpleType, removePolarVars: Bool = true): Type = {
       object SimplifyPipeline extends typer.SimplifyPipeline {
         def debugOutput(msg: => Str): Unit = println(msg)
       }
-      val sim = SimplifyPipeline(ty)(ctx)
+      val sim = SimplifyPipeline(ty, removePolarVars)(ctx)
       val exp = typer.expandType(sim)
       exp
     }
@@ -363,6 +371,25 @@ object Main {
           errorOccurred = true
       }
     }
+    
+    
+    
+    // * Copied/adapted from DiffTest (TODO factorize)
+    
+    val tvs = typer.createdTypeVars.toList
+    
+    val recs = tvs.filter(_.isRecursive_$(omitTopLevel = true)(ctx))
+    
+    recs.find(_.prov.loco.isDefined).orElse(recs.headOption).foreach { tv =>
+      import Message._
+      errorOccurred = true
+      res ++= report(ErrorReport(
+        msg"Inferred recursive type: ${
+          getType(tv, removePolarVars = false).show
+        }" -> tv.prov.loco :: Nil))
+    }
+    
+    
     
     results.toList -> (if (errorOccurred) S(res.toString) else N)
   }

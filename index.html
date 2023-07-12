@@ -9,28 +9,31 @@
   <h1>SuperF online demonstration</h1>
   <div id="content">
     <textarea id="mlscript-input" class="panel" spellcheck="false">
-class List[A]
-  method Fold: (() -> 'b, (A, List[A]) -> 'b) -> 'b
-class Nil[A]: List[A]
-  method Fold(f, _) = f()
-class Cons[A]: List[A] & { head: A; tail: List[A] }
-  method Fold(_, f) = f(this.head, this.tail)
+datatype Option[A] = Some(A,) || None
 
-def nil = Nil {} : List['a]
-def cons(head, tail) = Cons { head; tail } : List['a]
+def foo f = (f 123, f true)
+fooid = foo id
+fooSome = foo Some
+
+def bar f = (f (fun x -> x), f (fun x -> Some x))
+test = bar foo
+
+
+datatype List[A] = Cons(A, List[A]) || Nil
 
 rec def find(table, key) =
-  table.Fold(
-    fun () -> undefined,
-    fun (h, t) -> if eq h.key key then h.val else find(t, key))
+  match table with
+    | Nil -> None
+    | Cons(h, t) ->
+        if h.key == key then Some(h.val) else find(t, key)
 
-ls = cons({key="I"; val=id}, cons({key="omega"; val=fun x -> x x}, nil))
+ls = Cons({key=0; val=id}, Cons({key=1; val=fun x -> x x}, Nil))
 
-res = find(ls, "omega")
+res = find(ls, 1)
 
-case res of undefined -> "???", _ -> res id "!"
-
-find(ls, "oops")
+match res with
+  | None -> ("???", false)
+  | Some(r) -> (r id "!!!", r id true)
 </textarea>
 <!-- let rec recursive_monster = fun x ->
   { thing = x;
@@ -102,14 +105,9 @@ find(ls, "oops")
     <td><code>let x = s in t</code></td>
   </tr>
   <tr>
-    <td>pattern matching 1</td>
+    <td>pattern matching</td>
     <td></td>
-    <td><code>case t of C1 -> t1, C2 -> t2</code></td>
-  </tr>
-  <tr>
-    <td>pattern matching 2</td>
-    <td></td>
-    <td><code>case t of C1 -> t1, C2 -> t2, _ -> t3</code></td>
+    <td><code>match t with C1(a, b, c) -> t1 | C2 -> t2</code></td>
   </tr>
   <tr>
     <td colspan="3"><b>Top-Level Declarations</b></td>
@@ -117,9 +115,25 @@ find(ls, "oops")
   <tr>
     <td>definition</td>
     <td><code>def foo: T</code></td>
-    <td><code>def foo = t </code>or just&ensp;<code>foo = t</code></td>
+    <td>
+      <code>rec def foo = t </code>or&ensp;
+      <code>def foo = t </code>or just&ensp;<code>foo = t</code></td>
   </tr>
   <tr>
+    <td>algebraic data type</td>
+    <td><code>
+      datatype Option[A] = Some(A,) || None
+    </code></td>
+    <td><code>
+      Some(t), None
+    </code></td>
+  </tr>
+  <tr>
+    <td>type alias</td>
+    <td><code>type Foo[T] =<br/>&emsp; MyClass[(T, T)] -> MyClass[T]</code></td>
+    <td></td>
+  </tr>
+  <!-- <tr>
     <td>class, trait, method</td>
     <td><code>
       trait MyBase[T]: { fld1: T }
@@ -131,12 +145,7 @@ find(ls, "oops")
       <br/>&emsp; method Foo x = x + 1
     </code></td>
     <td><code>mc = MyClass { fld1 = 0; fld2 = "ok" }<br/><br/>mc.Bar</code></td>
-  </tr>
-  <tr>
-    <td>type alias</td>
-    <td><code>type Foo[T] =<br/>&emsp; MyClass[(T, T)] -> MyClass[T]</code></td>
-    <td></td>
-  </tr>
+  </tr> -->
   <tr>
     <td colspan="3"><b>Miscellaneous</b></td>
   </tr>
@@ -182,7 +191,7 @@ find(ls, "oops")
     <td><code>F[(S, T)]</code></td>
     <td><code>f((s, t))</code></td>
   </tr>
-  <tr>
+  <!-- <tr>
     <td colspan="3"><b>Boolean Algebra</b></td>
   </tr>
   <tr>
@@ -203,7 +212,7 @@ find(ls, "oops")
     <td>nominal tag</td>
     <td><code>#C</code></td>
     <td></td>
-  </tr>
+  </tr> -->
 </table>
 
 <br/>
