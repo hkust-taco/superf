@@ -41,8 +41,33 @@ showing that the addition of FCP was smooth and did not break most existing test
 We have manually transcribed the OCaml List module in file `shared/src/test/diff/fcp/OCamlList.mls`,
 showing that we can type check that file without the help of any intermediate type annotations.
 
+The code is in three parts:
+
+ 1. Specification of general OCaml definition signatures.
+ 2. Specification from OCaml's [`List.mli`](https://github.com/ocaml/ocaml/blob/5312b4d7b913cde2a69fc0eb5e97e353865b82df/stdlib/list.mli) signature file.
+ 3. Impelemntations from OCaml's [`List.ml`](https://github.com/ocaml/ocaml/blob/5312b4d7b913cde2a69fc0eb5e97e353865b82df/stdlib/list.ml).
 
 
+Our compiler type checked all these definitions in order and inserted the inferred types as `//│` comments below the corresponding code blocks.
+
+When a type signature was declared before and an implementation is provided, our compiler infers the implementation's type first, and then checks that type against the signature, which leads to an output of the following form:
+```fsharp
+def idInt : int -> int
+//│ idInt: int -> int
+
+def idInt x = x
+//│ 'a -> 'a
+//│   <:  idInt:
+//│ int -> int
+```
+Above, one can see that the _inferred_ type is `'a -> 'a` (i.e., `forall 'a. a -> 'a`), and this is successfully checked against the provided type signature `int -> int`.
+
+Notes:
+
+ - `anything` is the top type
+ - `nothing` is the bottom type
+ - `?`, as in `List[?]`, is a shorthand for `List['a]` for some fresh `'a` quantified at the top-level
+ - The notation `??x`, which sometimes appear in examples that leak skolems, is really just a way of keeping track of extrusions in order to better pretty-print infer type and to better report type errors, using type variable names that are more informative than ⊤ and ⊥. The syntax can be understood as attaching to those ⊤ and ⊥ introduced during extrusion the names of the corresponding extruded type variables as metadata.
 
 
 
