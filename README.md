@@ -122,7 +122,7 @@ launch the SBT shell by typing `sbt` in the terminal.
 ### Commands and validating our claims
 
 Running the main MLscript tests only requires the Scala Build Tool installed.
-In the SBT shell, `mlscriptJVM/test`.
+In the SBT shell, run `mlscriptJVM/test`.
 
 Running the ts2mls MLscript tests requires NodeJS, and TypeScript in addition.
 In the SBT shell, run `ts2mlsTest/test`.
