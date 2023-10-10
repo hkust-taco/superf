@@ -78,29 +78,17 @@ Please `cd` to `mlscript/` and launch the SBT shell by typing `sbt`.
 
 ## Setting up from Scratch
 
-### Prerequisites
-
 You need [JDK supported by Scala][supported-jdk-versions], [sbt][sbt], [Node.js][node.js], and TypeScript to compile the project and run the tests.
 
-We recommend you to install JDK and sbt via [coursier][coursier]. The versions of Node.js that passed our tests are from v16.14 to v16.17, v17 and v18. Run `npm install` to install TypeScript. **Note that ScalaJS cannot find the global installed TypeScript.** We explicitly support TypeScript v4.7.4.
+We recommend you to install JDK and `sbt` via [coursier][coursier]. The versions of Node.js that passed our tests are from v16.14 to v16.17, v17 and v18. Run `npm install` to install TypeScript. **Note that ScalaJS cannot find the global installed TypeScript.** We explicitly support TypeScript v4.7.4.
 
 [supported-jdk-versions]: https://docs.scala-lang.org/overviews/jdk-compatibility/overview.html
 [sbt]: https://www.scala-sbt.org/
 [node.js]: https://nodejs.org/
 [coursier]: https://get-coursier.io/
 
----
-
-If one would like to run our implementation on their host system from scratch,
-please follow the following steps:
-
-1. Install NodeJS (for example `v16.17`) from https://nodejs.org/en/download/.
-   Ensure your PATH is updated and the `node` command is available in the terminal.
-
-2. Follow the Coursier installation instructions at https://get-coursier.io/docs/cli-installation.
-
-3. Change your working directory to the root of this repository and
-   launch the SBT shell by typing `sbt` in the terminal.
+After installing the prerequisites, change your working directory to the root of this repository and
+launch the SBT shell by typing `sbt` in the terminal.
 
 ## Project Structure
 
@@ -134,13 +122,13 @@ please follow the following steps:
 ### Commands and validating our claims
 
 Running the main MLscript tests only requires the Scala Build Tool installed.
-In the terminal, run `sbt mlscriptJVM/test`.
+In the SBT shell, `mlscriptJVM/test`.
 
 Running the ts2mls MLscript tests requires NodeJS, and TypeScript in addition.
-In the terminal, run `sbt ts2mlsTest/test`.
+In the SBT shell, run `ts2mlsTest/test`.
 
 You can also run all tests simultaneously.
-In the terminal, run `sbt test`.
+In the SBT shell, run `test`.
 
 Test output is inserted **in place** in the test file after each corresponding block, as comments beginning with `//│`.
 This makes it very easy and convenient to see the test results for each code block.
@@ -190,14 +178,13 @@ For example, `~mlscriptJVM/testOnly mlscript.DiffTests -- -z parser` will watch 
 
 ## Running the web demo locally
 
-To run the demo on your computer, compile the project with `sbt fastOptJS`, then open the `local_testing.html` file in your browser.
+To run the demo on your computer, compile the project with SBT command `fastOptJS`, then open the `local_testing.html` file in your browser.
 
 You can make changes to the type inference code
 in `shared/src/main/scala/mlscript`,
 have it compile to JavaScript on file change with command
-`sbt ~fastOptJS`,
+`~fastOptJS`,
 and immediately see the results in your browser by refreshing the page with `F5`.
-
 
 
 
