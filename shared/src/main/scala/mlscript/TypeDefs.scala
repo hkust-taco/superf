@@ -25,6 +25,7 @@ class TypeDefs extends NuTypeDefs { self: Typer =>
    * @param baseClasses base class if the class or interface inherits from any
    * @param toLoc source location related information
    * @param positionals positional term parameters of the class
+   * @param adtData maps a class to its ADT by name
    */
   case class TypeDef(
     kind: TypeDefKind,
@@ -36,11 +37,7 @@ class TypeDefs extends NuTypeDefs { self: Typer =>
     baseClasses: Set[TypeName],
     toLoc: Opt[Loc],
     positionals: Ls[Str],
-    // maps a class to it's adt by name and maps params to adt param by position
-    // for e.g. in type 'a, 'b either = Left of 'a | Right of 'b
-    // Right will have an adtData = S((TypeName("either"), List(1)))
-    // indicating that it's adt is either and it's param is the 1th param of either
-    adtData: Opt[AdtInfo] = N
+    adtData: Opt[AdtInfo] = N,
   ) {
     def allBaseClasses(ctx: Ctx)(implicit traversed: Set[TypeName]): Set[TypeName] =
       baseClasses.map(v => TypeName(v.name.decapitalize)) ++
@@ -314,9 +311,7 @@ class TypeDefs extends NuTypeDefs { self: Typer =>
                 // * This is not actually necessary for soundness
                 // *  (if they aren't, the object type just won't be instantiable),
                 // *  but will help report inheritance errors earlier (see test BadInherit2).
-                case (nme, FieldType(S(lb), ub)) =>
-                  implicit val shadows: Shadows = Shadows.empty
-                  constrain(lb, ub)
+                case (nme, FieldType(S(lb), ub)) => constrain(lb, ub)
                 case _ => ()
               }
               (decls -- defns) match {
@@ -391,7 +386,6 @@ class TypeDefs extends NuTypeDefs { self: Typer =>
     def typeMethods(implicit ctx: Ctx): Ctx = {
       /* Perform subsumption checking on method declarations and definitions by rigidifying class type variables,
        * then register the method signatures in the context */
-      implicit val shadows: Shadows = Shadows.empty
       def checkSubsume(td: TypeDef, mds: MethodSet): Unit = {
         val tn = td.nme
         val MethodSet(_, _, decls, defns) = mds
@@ -713,10 +707,11 @@ class TypeDefs extends NuTypeDefs { self: Typer =>
           case Without(base, names) => updateVariance(base, curVariance.flip)
           case Overload(alts) => alts.foreach(updateVariance(_, curVariance))
           case PolymorphicType(lvl, bod) =>
-            // * [FIXME:1](LP): here we should actually ignore from the analysis
+            // * It seems we should want to ignore from the analysis
             // *  those type vars that are being quantified...
             // *  When the same variable occurs both as quantified and not quantified
-            // *  in a type, this can make a difference (like currently in `analysis/Weird.mls`)
+            // *  in a type, this could make a difference
+            // *  (like it used to in `analysis/Weird.mls`)
             updateVariance(bod, curVariance)
           case ConstrainedType(cs, bod) =>
             cs.foreach { lu =>

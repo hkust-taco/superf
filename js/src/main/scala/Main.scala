@@ -214,7 +214,7 @@ object Main {
       object SimplifyPipeline extends typer.SimplifyPipeline {
         def debugOutput(msg: => Str): Unit = println(msg)
       }
-      val sim = SimplifyPipeline(ty, removePolarVars)(ctx)
+      val sim = SimplifyPipeline(ty, S(true), removePolarVars)(ctx)
       val exp = typer.expandType(sim)
       exp
     }
@@ -378,7 +378,7 @@ object Main {
     
     val tvs = typer.createdTypeVars.toList
     
-    val recs = tvs.filter(_.isRecursive_$(omitTopLevel = true)(ctx))
+    val recs = tvs.filter(_.isRecursive_$(omitIrrelevantVars = true)(ctx))
     
     recs.find(_.prov.loco.isDefined).orElse(recs.headOption).foreach { tv =>
       import Message._

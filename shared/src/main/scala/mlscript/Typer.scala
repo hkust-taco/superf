@@ -83,7 +83,7 @@ class Typer(var dbg: Boolean, var verbose: Bool, var explainErrors: Bool)
     private def containsMth(key: (Str, Str) \/ (Opt[Str], Str)): Bool = mthEnv.contains(key) || parent.exists(_.containsMth(key))
     def containsMth(parent: Opt[Str], nme: Str): Bool = containsMth(R(parent, nme))
     def nest: Ctx = copy(Some(this), MutMap.empty, MutMap.empty)
-    def nextLevel[R](k: Ctx => R)(implicit raise: Raise, prov: TP, shadows: Shadows=Shadows.empty): R = { // TODO rm implicits here and in freshen functions
+    def nextLevel[R](k: Ctx => R)(implicit raise: Raise, prov: TP): R = {
       val newCtx = copy(lvl = lvl + 1, extrCtx = MutMap.empty)
       val res = k(newCtx)
       val ec = newCtx.extrCtx
@@ -98,7 +98,7 @@ class Typer(var dbg: Boolean, var verbose: Bool, var explainErrors: Bool)
       }()
       res
     }
-    def poly(k: Ctx => ST)(implicit raise: Raise, prov: TP, shadows: Shadows=Shadows.empty): ST = {
+    def poly(k: Ctx => ST)(implicit raise: Raise, prov: TP, shadows: Shadows = Shadows.empty): ST = {
       nextLevel { newCtx =>
         
         val innerTy = k(newCtx)
@@ -196,6 +196,7 @@ class Typer(var dbg: Boolean, var verbose: Bool, var explainErrors: Bool)
       "anything" -> TopType, "nothing" -> BotType)
   
   val builtinTypes: Ls[TypeDef] =
+    TypeDef(Cls, TypeName("?"), Nil, TopType, Nil, Nil, Set.empty, N, Nil) :: // * Dummy for pretty-printing unknown type locations
     TypeDef(Cls, TypeName("int"), Nil, TopType, Nil, Nil, Set.single(TypeName("number")), N, Nil) ::
     TypeDef(Cls, TypeName("number"), Nil, TopType, Nil, Nil, Set.empty, N, Nil) ::
     TypeDef(Cls, TypeName("bool"), Nil, TopType, Nil, Nil, Set.empty, N, Nil) ::
@@ -523,7 +524,7 @@ class Typer(var dbg: Boolean, var verbose: Bool, var explainErrors: Bool)
   
   /** Like `typeLetRhs` but removes unnecessary polymorphic type wrappers. */
   def typeLetRhs2(isrec: Boolean, nme: Str, rhs: Term)(implicit ctx: Ctx, raise: Raise): ST = {
-    val res = typeLetRhs(isrec: Boolean, nme: Str, rhs: Term)(ctx, raise, Map.empty, genLambdas = true)
+    val res = typeLetRhs(isrec, nme, rhs)(ctx, raise, Map.empty, genLambdas = true)
     def stripPoly(ty: ST): ST = ty match {
       case pt: PolymorphicType =>
         PolymorphicType.mk(pt.polymLevel, stripPoly(pt.body))
@@ -820,14 +821,15 @@ class Typer(var dbg: Boolean, var verbose: Bool, var explainErrors: Bool)
           val param_ty = typePattern(pat)(newCtx, raise, vars)
           val midCtx = newCtx
           val body_ty = typeTerm(body)(newCtx, raise, vars,
-            doGenLambdas && (generalizeCurriedFunctions || constrainedTypes))
+            generalizeCurriedFunctions || doGenLambdas && constrainedTypes)
           FunctionType(param_ty, body_ty)(tp(term.toLoc, "function"))
         }
       case Lam(pat, body) =>
         val newCtx = ctx.nest
         val param_ty = typePattern(pat)(newCtx, raise, vars)
         assert(!doGenLambdas)
-        val body_ty = typeTerm(body)(newCtx, raise, vars, genLambdas)
+        val body_ty = typeTerm(body)(newCtx, raise, vars,
+          generalizeCurriedFunctions || doGenLambdas)
         FunctionType(param_ty, body_ty)(tp(term.toLoc, "function"))
       case App(App(Var("is"), _), _) =>
         val desug = If(IfThen(term, Var("true")), S(Var("false")))
@@ -873,7 +875,6 @@ class Typer(var dbg: Boolean, var verbose: Bool, var explainErrors: Bool)
           ), res)
         resTy
       case Sel(obj, fieldName) =>
-        implicit val shadows: Shadows = Shadows.empty
         // Explicit method calls have the form `x.(Class.Method)`
         // Implicit method calls have the form `x.Method`
         //   If two unrelated classes define methods of the same name,
@@ -1128,8 +1129,7 @@ class Typer(var dbg: Boolean, var verbose: Bool, var explainErrors: Bool)
             case _ => die
           }
           vars ++ newVars |> { implicit vars =>
-            implicit val genLambdas: GenLambdas = false
-            typeTerm(bod)
+            typeMonomorphicTerm(bod)
           }
         }
       case Inst(bod) =>
@@ -1138,7 +1138,6 @@ class Typer(var dbg: Boolean, var verbose: Bool, var explainErrors: Bool)
         def go(ty: ST): ST = ty.unwrapAll match {
           case pt: PolymorphicType =>
             founPoly = true
-            implicit val shadows: Shadows = Shadows.empty
             go(pt.instantiate)
           case _ => ty
         }

@@ -16,7 +16,7 @@ trait TypeSimplifier { self: Typer =>
   /** Remove bounds that are not reachable by traversing the type following variances.
     * Note that doing this on annotated type signatures would need to use polarity None
     *   because a type signature can both be used (positively) and checked against (negatively). */
-  def removeIrrelevantBounds(ty: SimpleType, pol: Opt[Bool] = S(true), inPlace: Bool = false)
+  def removeIrrelevantBounds(ty: SimpleType, pol: Opt[Bool], inPlace: Bool = false)
         (implicit ctx: Ctx): SimpleType =
   {
     val _ctx = ctx
@@ -110,7 +110,6 @@ trait TypeSimplifier { self: Typer =>
         val res = process(bod, parent, canDistribForall = S(plvl))
         canDistribForall match {
           case S(outerLvl) if distributeForalls =>
-            implicit val shadows: Shadows = Shadows.empty
             implicit val ctx: Ctx = _ctx.copy(lvl = outerLvl + 1)
             PolymorphicType(plvl, res).instantiate
           case _ =>
@@ -135,7 +134,7 @@ trait TypeSimplifier { self: Typer =>
   
   /** Transform the type recursively, putting everything in Disjunctive Normal Forms and reconstructing class types
     * from their structural components. */
-  def normalizeTypes_!(st: SimpleType, pol: Opt[Bool] = S(true))(implicit ctx: Ctx): SimpleType =
+  def normalizeTypes_!(st: SimpleType, pol: Opt[Bool])(implicit ctx: Ctx): SimpleType =
   {
     val _ctx = ctx
     
@@ -212,7 +211,31 @@ trait TypeSimplifier { self: Typer =>
                       case (lb, ub) =>
                         vs(tv) match {
                           case VarianceInfo(true, true) => TypeBounds.mk(BotType, TopType)
-                          case VarianceInfo(false, false) => TypeBounds.mk(lb, ub)
+                          case VarianceInfo(false, false) =>
+                            // * FIXME: this usage of type bounds is wrong!
+                            // * We're here using it as though it meant a bounded wildcard,
+                            // * for the purpose of type pretty-printing...
+                            // * But this is inconsistent with other uses of these types as *absolute* type ranges!
+                            TypeBounds.mk(lb, ub)
+                            // * However, the fix is to make all TR arguments actual bounded wildcards
+                            // * which is not easy as it requires extensive refactoring
+                            // * 
+                            // * Note that the version below doesn't work because the refinement redundancy tests
+                            // * below require non-polar types to compare against, so TypeBounds is inadequate.
+                            /* 
+                            pol match {
+                              case N => ???
+                                TypeBounds.mk(lb, ub)
+                              case S(true) => 
+                                TypeBounds.mk(lb, ub)
+                              case S(false) => 
+                                TypeBounds.mk(ub, lb)
+                            }
+                            */
+                            // * FIXME In fact, the use of such subtyping checks should render
+                            // * all uses of TypeBounds produced by the simplifier inadequate!
+                            // * We should find a proper solution to this at some point...
+                            // * (Probably by only using proper wildcards in the type simplifier.)
                           case VarianceInfo(co, contra) =>
                             if (co) ub else lb
                         }
@@ -331,7 +354,6 @@ trait TypeSimplifier { self: Typer =>
       val base = ConstrainedType.mk(cons, res)
       canDistribForall match {
         case S(outerLvl) if distributeForalls =>
-          implicit val shadows: Shadows = Shadows.empty
           implicit val ctx: Ctx = _ctx.copy(lvl = outerLvl + 1)
           PolymorphicType(dnf.polymLevel, base).instantiate
         case _ => PolymorphicType.mk(dnf.polymLevel, base)
@@ -342,13 +364,9 @@ trait TypeSimplifier { self: Typer =>
       pol match {
         case S(p) => helper(DNF.mk(MaxLevel, Nil, ty, p)(ctx, ptr = true, etf = false), pol, canDistribForall)
         case N =>
-          if (!ty.mentionsTypeBounds)
-            helper(DNF.mk(MaxLevel, Nil, ty, true)(ctx, ptr = true, etf = false), N, canDistribForall)
-          else {
-            val dnf1 = DNF.mk(MaxLevel, Nil, ty, false)(ctx, ptr = true, etf = false)
-            val dnf2 = DNF.mk(MaxLevel, Nil, ty, true)(ctx, ptr = true, etf = false)
-            TypeBounds.mk(helper(dnf1, S(false), canDistribForall), helper(dnf2, S(true), canDistribForall))
-          }
+        val dnf1 = DNF.mk(MaxLevel, Nil, ty, false)(ctx, ptr = true, etf = false)
+        val dnf2 = DNF.mk(MaxLevel, Nil, ty, true)(ctx, ptr = true, etf = false)
+        TypeBounds.mk(helper(dnf1, S(false), canDistribForall), helper(dnf2, S(true), canDistribForall))
       }
     }(r => s"~> $r")
     
@@ -371,7 +389,7 @@ trait TypeSimplifier { self: Typer =>
   
   
   /** Remove polar type variables, unify indistinguishable ones, and inline the bounds of non-recursive ones. */
-  def simplifyType(st: SimpleType, removePolarVars: Bool, pol: Opt[Bool] = S(true), inlineBounds: Bool = true)(implicit ctx: Ctx): SimpleType = {
+  def simplifyType(st: SimpleType, removePolarVars: Bool, pol: Opt[Bool], inlineBounds: Bool = true)(implicit ctx: Ctx): SimpleType = {
     
     
     
@@ -435,7 +453,7 @@ trait TypeSimplifier { self: Typer =>
     
     // * * Analysis 2: find the polar co-occurrences of each TV
     
-    // * TODO what about negatively quantified vars? the notion of co-occurrence would be reversed (wrt unions/inters)
+    // * Note that for negatively-quantified type variables, the notion of co-occurrence is reversed!
     
     val coOccurrences: MutMap[(Bool, TypeVariable), MutSet[SimpleType]] = LinkedHashMap.empty
     
@@ -618,7 +636,7 @@ trait TypeSimplifier { self: Typer =>
     
     def computeRecVars =
       allVars.iterator.filter(v => !varSubst.contains(v) && (
-        v.isRecursive_$(omitTopLevel = false)
+        v.isRecursive_$(omitIrrelevantVars = false)
         // * Note: a more precise version could be the following,
         // * but it doesn't seem to change anything in our test suite, so I left if commented for now:
         // // * Only consider recursive those variables that recursive in their *reachable* bounds:
@@ -645,10 +663,8 @@ trait TypeSimplifier { self: Typer =>
     allVars.foreach { case v0 => if (!recVars.contains(v0)) {
       (coOccurrences.get(true -> v0), coOccurrences.get(false -> v0)) match {
         case (Some(_), None) | (None, Some(_)) =>
-          if (removePolarVars) {
-            println(s"1[!] $v0")
-            varSubst += v0 -> None
-          }; ()
+          println(s"1[!] $v0")
+          varSubst += v0 -> None
         case occ => assert(occ =/= (None, None), s"$v0 has no occurrences...")
       }
     }}
@@ -664,11 +680,11 @@ trait TypeSimplifier { self: Typer =>
           if !recVars(v) // can't reduce recursive sandwiches, obviously
           && coOccurrences.get(false -> v).exists(_(atom))
         =>
-          println(s"  [..] $v ${atom}")
-          val bundle = TypeBounds.mk(
+          val bundle = TypeBounds.mkSafe(
               v.upperBounds.foldLeft(atom)(_ &- _),
               v.lowerBounds.foldLeft(atom)(_ | _),
             )
+          println(s"  [..] $v := ${bundle}")
           varSubst += v -> S(bundle)
         
         case w: TV if !(w is v) && !varSubst.contains(w) && !varSubst.contains(v) && !recVars(v)
@@ -684,11 +700,11 @@ trait TypeSimplifier { self: Typer =>
           //   varSubst += w -> N
           // } else {
           
-          println(s"  [..] $v ${w}")
-          val bundle = TypeBounds.mk(
+          val bundle = TypeBounds.mkSafe(
               v.upperBounds.foldLeft(w: ST)(_ &- _),
               v.lowerBounds.foldLeft(w: ST)(_ | _),
             )
+          println(s"  [..] $v := ${bundle}")
           varSubst += v -> S(bundle)
           
           // }
@@ -820,9 +836,12 @@ trait TypeSimplifier { self: Typer =>
         ot.mapAltsPol(pol)((p, t) => transform(t, p, parents, canDistribForall))
       case SkolemTag(id) => transform(id, pol, parents)
       case _: TypeTag | ExtrType(_) => st
-      case tv: TypeVariable if parents.exists(_ === tv) =>
-        if (pol(tv).isEmpty) transform(tv, pol, parents - tv) else
-        if (pol(tv).getOrElse(lastWords(s"parent in invariant position $tv $parents"))) BotType else TopType
+      case tv: TypeVariable if parents(tv) =>
+        pol(tv) match {
+          case S(true) => BotType
+          case S(false) => TopType
+          case N => transform(tv, pol, parents - tv)
+        }
       case tv: TypeVariable =>
         varSubst.get(tv) match {
           case S(S(tv2)) =>
@@ -830,15 +849,21 @@ trait TypeSimplifier { self: Typer =>
             transform(tv2, pol, parents + tv, canDistribForall)
           case S(N) =>
             println(s"-> bound ${pol(tv)}")
-            pol(tv).fold {
+            val p = pol(tv)
+            if (!removePolarVars && (
+                   tv.lowerBounds.isEmpty && p.contains(true)
+                || tv.upperBounds.isEmpty && p.contains(false)
+                || tv.lowerBounds.isEmpty && tv.upperBounds.isEmpty
+            )) ClassTag(Var("?"), Set.empty)(noProv)
+            else p.fold {
               // TypeBounds.mk(mergeTransform(true, tv, parents + tv), mergeTransform(false, tv, parents + tv)) // FIXME polarities seem inverted
               lastWords("Should not be replacing an invariant type variable by its bound...") // ?
               pol.quantifPolarity(tv.level).base match {
                 case S(true) =>
-                  TypeBounds.mk(mergeTransform(false, pol, tv, parents + tv, canDistribForall),
+                  TypeBounds.mkSafe(mergeTransform(false, pol, tv, parents + tv, canDistribForall),
                     mergeTransform(true, pol, tv, parents + tv, canDistribForall))
                 case S(false) =>
-                  TypeBounds.mk(mergeTransform(true, pol, tv, parents + tv, canDistribForall),
+                  TypeBounds.mkSafe(mergeTransform(true, pol, tv, parents + tv, canDistribForall),
                     mergeTransform(false, pol, tv, parents + tv, canDistribForall))
                 case N => ???
               }
@@ -855,8 +880,8 @@ trait TypeSimplifier { self: Typer =>
               case S(p) if inlineBounds && !occursInvariantly(tv) && !recVars.contains(tv) =>
                 // * Inline the bounds of non-rec non-invar-occ type variables
                 println(s"Inlining [${printPol(p)}] bounds of $tv (~> $res)")
-                if (p) mergeTransform(true, pol, tv, Set.single(tv), canDistribForall) | res
-                else mergeTransform(false, pol, tv, Set.single(tv), canDistribForall) & res
+                if (p) mergeTransform(true, pol, tv, parents + tv, canDistribForall) | res
+                else mergeTransform(false, pol, tv, parents + tv, canDistribForall) & res
               case poltv if (!wasDefined) =>
                 def setBounds = {
                   trace(s"Setting [±] bounds of $res... (failing ${printPol(poltv)}, inlineBounds $inlineBounds, !occursInvariantly ${!occursInvariantly(tv)}, !recVars.contains(tv) ${!recVars.contains(tv)})") {
@@ -913,7 +938,7 @@ trait TypeSimplifier { self: Typer =>
         else if (pol.base === S(true)) transform(base, pol, semp, canDistribForall).withoutPos(names)
         else transform(base, pol, semp, canDistribForall).without(names)
       case tb @ TypeBounds(lb, ub) =>
-        pol.base.fold[ST](TypeBounds.mk(
+        pol.base.fold[ST](TypeBounds.mkSafe(
           transform(lb, PolMap.neg, parents, canDistribForall),
           transform(ub, PolMap.pos, parents, canDistribForall),
           noProv
@@ -924,7 +949,6 @@ trait TypeSimplifier { self: Typer =>
         val res = transform(bod, pol.enter(plvl), parents, canDistribForall = S(plvl))
         canDistribForall match {
           case S(outerLvl) if distributeForalls =>
-            implicit val shadows: Shadows = Shadows.empty
             ctx.copy(lvl = outerLvl + 1) |> { implicit ctx =>
               PolymorphicType(plvl, res).instantiate
             }
@@ -954,7 +978,7 @@ trait TypeSimplifier { self: Typer =>
     * So if no other upper bounds end up in ?a AND ?a is polar
     *   (so that ?a occurrences are indistinguishable from `{x: ?a}`),
     *   we'll eventually want to refactor ?b's recursive upper bound structure into just `?b <! ?a`. */
-  def unskidTypes_!(st: SimpleType, pol: Bool = true)(implicit ctx: Ctx): SimpleType = {
+  def unskidTypes_!(st: SimpleType, pol: Bool)(implicit ctx: Ctx): SimpleType = {
     
     val allVarPols = st.getVarsPol(PolMap(S(pol)))
     println(s"allVarPols: ${printPols(allVarPols)}")
@@ -1020,7 +1044,7 @@ trait TypeSimplifier { self: Typer =>
   
   /** Unify polar recursive type variables that have the same structure.
     * For example, `?a <: {x: ?a}` and `?b <: {x: ?b}` will be unified if they are bith polar. */
-  def factorRecursiveTypes_!(st: SimpleType, approximateRecTypes: Bool, pol: Opt[Bool] = S(true))(implicit ctx: Ctx): SimpleType = {
+  def factorRecursiveTypes_!(st: SimpleType, approximateRecTypes: Bool, pol: Opt[Bool])(implicit ctx: Ctx): SimpleType = {
     
     val allVarPols = st.getVarsPol(PolMap(pol))
     println(s"allVarPols: ${printPols(allVarPols)}")
@@ -1106,21 +1130,21 @@ trait TypeSimplifier { self: Typer =>
   abstract class SimplifyPipeline {
     def debugOutput(msg: => Str): Unit
     
-    def apply(st: ST, removePolarVars: Bool = true)(implicit ctx: Ctx): ST = {
+    def apply(st: ST, pol: Opt[Bool], removePolarVars: Bool = true)(implicit ctx: Ctx): ST = {
       var cur = st
       
       debugOutput(s"⬤ Initial: ${cur}")
       debugOutput(s" where: ${cur.showBounds}")
       
-      cur = removeIrrelevantBounds(cur, inPlace = false)
+      cur = removeIrrelevantBounds(cur, pol, inPlace = false)
       debugOutput(s"⬤ Cleaned up: ${cur}")
       debugOutput(s" where: ${cur.showBounds}")
       
-      cur = unskidTypes_!(cur)
+      pol.foreach(pol => cur = unskidTypes_!(cur, pol))
       debugOutput(s"⬤ Unskid: ${cur}")
       debugOutput(s" where: ${cur.showBounds}")
       
-      cur = simplifyType(cur, removePolarVars)
+      cur = simplifyType(cur, removePolarVars, pol)
       debugOutput(s"⬤ Type after simplification: ${cur}")
       debugOutput(s" where: ${cur.showBounds}")
       
@@ -1129,27 +1153,27 @@ trait TypeSimplifier { self: Typer =>
       // debugOutput(s"⬤ Factored: ${cur}")
       // debugOutput(s" where: ${cur.showBounds}")
       
-      cur = normalizeTypes_!(cur)
+      cur = normalizeTypes_!(cur, pol)
       debugOutput(s"⬤ Normalized: ${cur}")
       debugOutput(s" where: ${cur.showBounds}")
       
-      cur = removeIrrelevantBounds(cur, inPlace = true)
+      cur = removeIrrelevantBounds(cur, pol, inPlace = true)
       debugOutput(s"⬤ Cleaned up: ${cur}")
       debugOutput(s" where: ${cur.showBounds}")
       
-      cur = unskidTypes_!(cur)
+      pol.foreach(pol => cur = unskidTypes_!(cur, pol))
       debugOutput(s"⬤ Unskid: ${cur}")
       debugOutput(s" where: ${cur.showBounds}")
       
       // * The DNFs introduced by `normalizeTypes_!` may lead more coocc info to arise
       // *  by merging things like function types together...
       // * So we need another pass of simplification!
-      cur = simplifyType(cur, removePolarVars)
+      cur = simplifyType(cur, removePolarVars, pol)
       // cur = simplifyType(simplifyType(cur)(ct)
       debugOutput(s"⬤ Resim: ${cur}")
       debugOutput(s" where: ${cur.showBounds}")
       
-      cur = factorRecursiveTypes_!(cur, approximateRecTypes = false)
+      cur = factorRecursiveTypes_!(cur, approximateRecTypes = false, pol)
       debugOutput(s"⬤ Factored: ${cur}")
       debugOutput(s" where: ${cur.showBounds}")
       

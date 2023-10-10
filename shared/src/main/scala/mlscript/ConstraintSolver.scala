@@ -24,6 +24,10 @@ class ConstraintSolver extends NormalForms { self: Typer =>
   
   protected var currentConstrainingRun = 0
   
+  // * Each type has a shadow which identifies all variables created from copying
+  // * variables that existed at the start of constraining.
+  // * The intent is to make the total number of shadows in a given constraint
+  // * resolution run finite, so we can avoid divergence with a "cyclic-lookign constraint" error.
   type ShadowSet = Set[ST -> ST]
   case class Shadows(current: ShadowSet, previous: ShadowSet) {
     def size: Int = current.size + previous.size
@@ -302,7 +306,7 @@ class ConstraintSolver extends NormalForms { self: Typer =>
           (return println(s"OK  $done_ls & $tr  =:=  ${BotType}")), rs, done_rs)
         
         // case (ls, (tr @ TypeRef(_, _)) :: rs) => annoying(ls, done_ls, tr.expand :: rs, done_rs)
-        case (ls, (tr @ TypeRef(_, _)) :: rs) => annoying(ls, done_ls, rs, done_rs | tr getOrElse
+        case (ls, (tr @ TypeRef(_, _)) :: rs) => annoying(ls, done_ls, rs, done_rs | (tr, pol = false) getOrElse
           (return println(s"OK  $done_rs & $tr  =:=  ${TopType}")))
         
         /*
@@ -464,14 +468,15 @@ class ConstraintSolver extends NormalForms { self: Typer =>
       val lhs_rhs = lhs -> rhs
       stack.push(lhs_rhs)
       consumeFuel()
-      // Thread.sleep(10)  // useful for debugging constraint-solving explosions debugged on stdout
+      // Thread.sleep(10)  // useful for debugging constraint-solving explosions piped to stdout
       recImpl(lhs, rhs)(raise,
         if (sameLevel)
           (if (cctx._1.headOption.exists(_ is lhs)) cctx._1 else lhs :: cctx._1)
           ->
           (if (cctx._2.headOption.exists(_ is rhs)) cctx._2 else rhs :: cctx._2)
         else (lhs :: Nil) -> (rhs :: Nil),
-        if (sameLevel || prevCctxs.isEmpty) prevCctxs else cctx :: prevCctxs,
+        if (sameLevel || prevCctxs.isEmpty) prevCctxs // * See [note:2] below
+        else cctx :: prevCctxs,
         ctx,
         if (sameLevel) shadows else shadows.copy(current = Set.empty)
       )
@@ -502,7 +507,8 @@ class ConstraintSolver extends NormalForms { self: Typer =>
       // *    Therefore this subtyping check may not be worth it.
       // *    In any case, we make it more lightweight by not traversing type variables
       // *    and not using a subtyping cache (cf. `CompareRecTypes = false`).
-      if ({ implicit val ctr: CompareRecTypes = false; lhs <:< rhs }) ()
+      if ({ implicit val ctr: CompareRecTypes = false; lhs <:< rhs })
+        println(s"Already a subtype by <:<")
       
       // println(s"  where ${FunctionType(lhs, rhs)(primProv).showBounds}")
       else {
@@ -511,12 +517,9 @@ class ConstraintSolver extends NormalForms { self: Typer =>
           case (_: ProvType, _) | (_, _: ProvType) => shadows
           // * Note: contrary to Simple-sub, we do have to remember subtyping tests performed
           // *    between things that are not syntactically type variables or type references.
-          // *  Indeed, due to the normalization of unions and intersections in the wriong polarity,
+          // *  Indeed, due to the normalization of unions and intersections in the wrong polarity,
           // *    cycles in regular trees may only ever go through unions or intersections,
           // *    and not plain type variables.
-          // case (l: TV, r: TV) if noRecursiveTypes =>
-          //   if (cache(lhs_rhs)) return println(s"Cached! (not recursive")
-          //   cache += lhs_rhs
           case _ =>
             if (!noRecursiveTypes && cache(lhs_rhs)) return println(s"Cached!")
             val shadow = lhs.shadow -> rhs.shadow
@@ -550,7 +553,7 @@ class ConstraintSolver extends NormalForms { self: Typer =>
             
             if (!noRecursiveTypes) cache += lhs_rhs
             
-            Shadows(shadows.current + lhs_rhs + shadow, // FIXME this conflation is not quite correct
+            Shadows(shadows.current + lhs_rhs + shadow, // * FIXME this conflation is not quite correct
               shadows.previous + shadow)
             
         }) |> { implicit shadows: Shadows =>
@@ -753,7 +756,7 @@ class ConstraintSolver extends NormalForms { self: Typer =>
             // * the rigid type variables without extrusion,
             // * while preventing the rigid variables from leaking out.
             
-            // * Hack ("heuristic"): we only start remembering `prevCctxs`
+            // * [note:2] Hack ("heuristic"): we only start remembering `prevCctxs`
             // * after going through at least one instantiation.
             // * This is to filter out locations that were unlikely to cause
             // * any skolem extrusion down the line.
@@ -876,7 +879,13 @@ class ConstraintSolver extends NormalForms { self: Typer =>
       }
       
       
-      val failure = failureOpt.getOrElse((lhs.unwrapProvs, rhs.unwrapProvs) match {
+      val lhsBase = lhs.typeBase
+      def lhsIsPlain = lhsBase matches {
+        case _: FunctionType | _: RecordType | _: TypeTag | _: TupleType
+           | _: TypeRef | _: ExtrType => true
+      }
+      
+      val failure = failureOpt.getOrElse((lhsBase, rhs.unwrapProvs) match {
         case lhs_rhs @ ((_: Extruded, _) | (_, _: Extruded)) =>
           val (mainExtr, extr1, extr2, reason) = lhs_rhs match {
             case (extr: Extruded, extr2: Extruded)
@@ -936,9 +945,11 @@ class ConstraintSolver extends NormalForms { self: Typer =>
         case (lunw, RecordType((n, _) :: Nil))
           if !lunw.isInstanceOf[RecordType] => doesntHaveField(n.name)
         case (lunw, RecordType(fs @ (_ :: _)))
-          if !lunw.isInstanceOf[RecordType] =>
+          if lhsIsPlain && !lunw.isInstanceOf[RecordType] =>
             msg"is not a record (expected a record with field${
               if (fs.sizeCompare(1) > 0) "s" else ""}: ${fs.map(_._1.name).mkString(", ")})"
+        case (lunw, RecordType(fs @ (_ :: _))) =>
+          msg"does not have all required fields ${fs.map("'" + _._1.name + "'").mkString(", ")}"
         case _ => doesntMatch(rhs)
       })
       
@@ -1082,7 +1093,12 @@ class ConstraintSolver extends NormalForms { self: Typer =>
       case p @ ProvType(und) => ProvType(extrude(und, lowerLvl, pol, upperLvl))(p.prov)
       case p @ ProxyType(und) => extrude(und, lowerLvl, pol, upperLvl)
       case tt @ SkolemTag(id) =>
-        if (tt.level > lowerLvl) {
+        if (tt.level > upperLvl) {
+          extrude(id, lowerLvl, pol, upperLvl) match {
+            case id: TV => SkolemTag(id)(tt.prov)
+            case _ => die
+          }
+        } else if (tt.level > lowerLvl) {
             // * When a rigid type variable is extruded,
             // * we need to essentially widen it to Top or Bot.
             // * Creating a new skolem instead, as was done at some point, is actually unsound.
@@ -1091,7 +1107,7 @@ class ConstraintSolver extends NormalForms { self: Typer =>
             // * which achieves the same effect as Top/Bot.
             new Extruded(!pol, tt)(
               tt.prov.copy(desc = "extruded type variable reference"), reason)
-        } else ty
+        } else die // shouldn't happen
       case _: ClassTag | _: TraitTag | _: Extruded => ty
       case tr @ TypeRef(d, ts) =>
         TypeRef(d, tr.mapTargs(S(pol)) {
@@ -1182,7 +1198,7 @@ class ConstraintSolver extends NormalForms { self: Typer =>
     *   or which have bounds and whose level is greater than `above`. */
   def freshenAbove(above: Level, ty: SimpleType,
           rigidify: Bool = false, below: Level = MaxLevel, leaveAlone: Set[TV] = Set.empty)
-        (implicit ctx: Ctx, freshened: MutMap[TV, ST], shadows: Shadows)
+        (implicit ctx: Ctx, freshened: MutMap[TV, ST])
         : SimpleType =
   {
     def freshenImpl(ty: SimpleType, below: Level): SimpleType =
@@ -1253,7 +1269,7 @@ class ConstraintSolver extends NormalForms { self: Typer =>
           }
         case None =>
           val v = freshVar(tv.prov, S(tv), tv.nameHint)(if (tv.level > below) tv.level else {
-            assert(lvl <= below, "this condition shoudl not be true for the result to be correct")
+            assert(lvl <= below, "this condition should not be true for the result to be correct")
             lvl
           })
           freshened += tv -> v
