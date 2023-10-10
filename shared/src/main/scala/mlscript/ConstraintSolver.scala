@@ -553,7 +553,7 @@ class ConstraintSolver extends NormalForms { self: Typer =>
             
             if (!noRecursiveTypes) cache += lhs_rhs
             
-            Shadows(shadows.current + lhs_rhs + shadow, // * FIXME this conflation is not quite correct
+            Shadows(shadows.current + lhs_rhs + shadow,
               shadows.previous + shadow)
             
         }) |> { implicit shadows: Shadows =>
@@ -1112,8 +1112,7 @@ class ConstraintSolver extends NormalForms { self: Typer =>
       case tr @ TypeRef(d, ts) =>
         TypeRef(d, tr.mapTargs(S(pol)) {
           case (N, targ) =>
-            // * Note: the semantics of TypeBounds is inappropriuate for this use (known problem; FIXME later)
-            TypeBounds.mk(extrude(targ, lowerLvl, false, upperLvl), extrude(targ, lowerLvl, true, upperLvl)) // Q: ? subtypes?
+            TypeBounds.mk(extrude(targ, lowerLvl, false, upperLvl), extrude(targ, lowerLvl, true, upperLvl))
             // * A sanity-checking version, making sure the type range is correct (LB subtype of UB):
             /* 
             val a = extrude(targ, lowerLvl, false, upperLvl)
@@ -1127,7 +1126,6 @@ class ConstraintSolver extends NormalForms { self: Typer =>
         })(tr.prov)
       case PolymorphicType(polymLevel, body) =>
         PolymorphicType(polymLevel, extrude(body, lowerLvl, pol, upperLvl =
-            // upperLvl min polymLevel // * for some crazy reason, this stopped type checking
             Math.min(upperLvl, polymLevel)
           ))
       case ConstrainedType(cs, bod) =>
@@ -1210,12 +1208,7 @@ class ConstraintSolver extends NormalForms { self: Typer =>
       
       def freshen(ty: SimpleType): SimpleType = freshenImpl(ty, below)
       
-      if (
-        // * Note that commenting this broke the old semantics of wildcard TypeBound-s in signatures:
-        /* !rigidify // Rigidification now also substitutes TypeBound-s with fresh vars;
-                    // since these have the level of their bounds, when rigidifying
-                    // we need to make sure to copy the whole type regardless of level...
-        && */ ty.level <= above) ty else ty match {
+      if (ty.level <= above) ty else ty match {
       
       case tv: TypeVariable if leaveAlone(tv)  => tv
       
@@ -1227,20 +1220,6 @@ class ConstraintSolver extends NormalForms { self: Typer =>
           nv.assignedTo = S(ty2)
           nv
         })
-      
-      // * Note: I forgot why I though this was unsound...
-      /*
-      case tv: TypeVariable // THIS IS NOT SOUND: WE NEED TO REFRESH REGARDLESS!!
-        if tv.level > below
-        // It is not sound to ignore the bounds here,
-        //    as the bounds could contain references to other TVs with lower level;
-        //  OTOH, we don't want to traverse the whole bounds graph every time just to check
-        //    (using `levelBelow`),
-        //    so if there are any bounds registered, we just conservatively freshen the TV.
-        && tv.lowerBounds.isEmpty
-        && tv.upperBounds.isEmpty
-        => tv
-      */
       
       case tv: TypeVariable => freshened.get(tv) match {
         case Some(tv) => tv
@@ -1279,19 +1258,6 @@ class ConstraintSolver extends NormalForms { self: Typer =>
       }
       
       case t @ TypeBounds(lb, ub) =>
-        
-        // * This was done to make `?` behave similarly to an existential.
-        // * But this niche treatment just needlessly complicates things;
-        // * better implement proper existentials later on!
-        /*
-        if (rigidify) {
-          val tv = freshVar(t.prov, N) // FIXME coudl N here result in divergence? cf. absence of shadow
-          tv.lowerBounds ::= freshen(lb)
-          tv.upperBounds ::= freshen(ub)
-          tv
-        } else TypeBounds(freshen(lb), freshen(ub))(t.prov)
-        */
-        
         TypeBounds(freshen(lb), freshen(ub))(t.prov)
         
       case t @ FunctionType(l, r) => FunctionType(freshen(l), freshen(r))(t.prov)
@@ -1309,7 +1275,7 @@ class ConstraintSolver extends NormalForms { self: Typer =>
       case _: ClassTag | _: TraitTag | _: SkolemTag | _: Extruded => ty
       case w @ Without(b, ns) => Without(freshen(b), ns)(w.prov)
       case tr @ TypeRef(d, ts) => TypeRef(d, ts.map(freshen(_)))(tr.prov)
-      case pt @ PolymorphicType(polyLvl, bod) if pt.level <= above => pt // is this really useful?
+      case pt @ PolymorphicType(polyLvl, bod) if pt.level <= above => pt
       case pt @ PolymorphicType(polyLvl, bod) =>
         if (lvl > polyLvl) freshen(pt.raiseLevelTo(lvl))
         else PolymorphicType(polyLvl, freshenImpl(bod, below = below min polyLvl))
