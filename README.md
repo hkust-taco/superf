@@ -142,12 +142,23 @@ In the terminal, run `sbt ts2mlsTest/test`.
 You can also run all tests simultaneously.
 In the terminal, run `sbt test`.
 
-Our compiler type checked all these definitions in order and inserted the inferred types as `//│` comments below the corresponding code blocks.
+Test output is inserted **in place** in the test file after each corresponding block, as comments beginning with `//│`.
+This makes it very easy and convenient to see the test results for each code block.
+For this reason, we recommend using an editor that automatically reloads open files on changes. VSCode and Sublime Text work well for this.
+
 To validate each of our claims, please refer to the corresponding MLscript test sources
 and check the inferred types with those shown in the paper.
 Note that the syntax of the inferred types of our implementation
 is slightly different than that in the paper. Please refer to the following
 "Notes on inferred type syntax".
+
+The testing infrastructure is set up so that if there are any unstaged changes (as determined by `git`) in any test file
+(those in `shared/src/test/diff`), only the corresponding files will be tested.
+So you can make select modifications to some test files and run the test command again,
+and it will only run your modified tests.
+
+You can also run the tests continuously using the SBT command `~mlscriptJVM/testOnly mlscript.DiffTests`,
+which will watch for any changes in the project and re-run the tests automatically.
 
 
 ### Notes on inferred type syntax
@@ -157,7 +168,7 @@ is slightly different than that in the paper. Please refer to the following
 - `?`, as in `List[?]`, is a shorthand for `List['a]` for some fresh `'a` quantified at the top-level
 - The notation `??x`, which sometimes appear in examples that leak skolems, is really just a way of keeping track of extrusions in order to better pretty-print infer type and to better report type errors, using type variable names that are more informative than ⊤ and ⊥. The syntax can be understood as attaching to those ⊤ and ⊥ introduced during extrusion the names of the corresponding extruded type variables as metadata.
 
-### Providing type signature
+### Providing type signatures
 
 When a type signature was declared before and an implementation is provided, our compiler infers the implementation's type first, and then checks that type against the signature, which leads to an output of the following form:
 ```fsharp
@@ -176,26 +187,6 @@ Above, one can see that the _inferred_ type is `'a -> 'a` (i.e., `forall 'a. a -
 Individual tests can be run with `-z`.
 For example, `~mlscriptJVM/testOnly mlscript.DiffTests -- -z parser` will watch for file changes and continuously run all parser tests (those that have "parser" in their name).
 
-You can also indicate the test you want in `shared/src/test/scala/mlscript/DiffTests.scala`:
-
-```scala
-  // Allow overriding which specific tests to run, sometimes easier for development:
-  private val focused = Set[Str](
-    // Add the test file path here like this:
-    "shared/src/test/diff/mlscript/Methods.mls"
-  ).map(os.RelPath(_))
-```
-
-To run the tests in ts2mls sub-project individually,
-you can indicate the test you want in `ts2mls/js/src/test/scala/ts2mls/TSTypeGenerationTests.scala`:
-
-```scala
-private val testsData = List(
-    // Put all input files in the `Seq`
-    // Then indicate the output file's name
-    (Seq("Array.ts"), "Array.d.mls")
-  )
-```
 
 ## Running the web demo locally
 
