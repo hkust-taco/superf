@@ -1,4 +1,4 @@
-# POPL 2024 Artifact for: When Subtyping Constraints Liberate: A Novel Approach to First-Class-Polymorphic Type Inference
+# POPL 2024 Artifact for When Subtyping Constraints Liberate: A Novel Approach to First-Class-Polymorphic Type Inference
 
 
 This document follows the structure prescribed in https://popl24.sigplan.org/track/POPL-2024-artifact-evaluation.
@@ -32,7 +32,7 @@ These tests have been faithfully ported to SuperF and all live in the `shared/sr
 
 The tests in folders `shared/src/test/diff/fcp/`, `shared/src/test/diff/fcp-lit/`, and `shared/src/test/diff/mlf-examples/` are specifically meant to test first-class polymorphism (FCP) and usually use `:NoRecursiveTypes` (see description of the command below).
 Most tests in other folders predate the introduction of FCP in MLscript. Yet FCP type inference is still performed in these tests,
-showing that the addition of FCP was smooth and did not break most existing tests (the main exception being tests involving variations of the Y combinator through unannotated self applications).
+showing that the addition of FCP was smooth and did not break most existing tests (the main exception being tested involving variations of the Y combinator through unannotated self applications).
 
 
 
@@ -80,7 +80,7 @@ Please `cd` to `mlscript/` and launch the SBT shell by typing `sbt`.
 
 You need [JDK supported by Scala][supported-jdk-versions], [sbt][sbt], [Node.js][node.js], and TypeScript to compile the project and run the tests.
 
-We recommend you to install JDK and `sbt` via [coursier][coursier]. The versions of Node.js that passed our tests are from v16.14 to v16.17, v17 and v18. Run `npm install` to install TypeScript. **Note that ScalaJS cannot find the global installed TypeScript.** We explicitly support TypeScript v4.7.4.
+We recommend you to install JDK and `sbt` via [coursier][coursier]. The versions of Node.js that passed our tests are from v16.14 to v16.17, v17 and v18. Run `npm install` to install TypeScript. **Note that ScalaJS cannot find the globally installed TypeScript.** We explicitly support TypeScript v4.7.4.
 
 [supported-jdk-versions]: https://docs.scala-lang.org/overviews/jdk-compatibility/overview.html
 [sbt]: https://www.scala-sbt.org/
@@ -154,7 +154,7 @@ which will watch for any changes in the project and re-run the tests automatical
 - `anything` is the top type
 - `nothing` is the bottom type
 - `?`, as in `List[?]`, is a shorthand for `List['a]` for some fresh `'a` quantified at the top-level
-- The notation `??x`, which sometimes appear in examples that leak skolems, is really just a way of keeping track of extrusions in order to better pretty-print infer type and to better report type errors, using type variable names that are more informative than ⊤ and ⊥. The syntax can be understood as attaching to those ⊤ and ⊥ introduced during extrusion the names of the corresponding extruded type variables as metadata.
+- The notation `??x`, which sometimes appears in examples that leak skolems, is really just a way of keeping track of extrusions in order to better pretty-print infer type and to better report type errors, using type variable names that are more informative than ⊤ and ⊥. The syntax can be understood as attaching to those ⊤ and ⊥ introduced during extrusion the names of the corresponding extruded type variables as metadata.
 
 ### Providing type signatures
 
@@ -224,7 +224,7 @@ The most important algorithms to look at which (loosely) mirror what happens in 
 - `freshenAbove` in `ConstraintSolver.scala`, which instantiates a polymorphic type by duplicating all its quantified type variables (those with a level higher than the quantification level).
 - `extrudeAndCheck` in `ConstraintSolver.scala`, which performs extrusion of types with mismatched polymorphism level, creating approximants and transforming leaky skolems into the equivalent of Top and Bottom (using the `Extruded` data type).
 
-A major concept that you will encounter repeatedly if you look into the MLscript's type checker implementation but which are absent from the paper is that of *normal forms* (defined in `NormalForms.scala`).
+A major concept that you will encounter repeatedly if you look into the MLscript's type checker implementation but which is absent from the paper is that of *normal forms* (defined in `NormalForms.scala`).
 These are used for two things:
  - For type simplification before showing inferred types to users. Our submission does not give specific details on how we simplify types because it is by and large similar to how it was done in previous work
  - For constraint-solving involving non-polar lattice types (ie unions in negative positions and intersections in positive positions) – subfunctions `goToWork`, `constrainDNF`, and `annoying` in `ConstraintSolver.scala` are the ones that are invoked in these cases. Such constraints never come up on their own if one restricts themselves to the polar type annotation syntax proposed in the paper. Indeed, only unions in positive positions and intersections in negative positions naturally arise from type inference. Therefore, normal-form constraint solving can be safely ignored while reviewing this artifact with SuperF in mind.
@@ -232,9 +232,9 @@ These are used for two things:
 
 In the interest of transparency, and to maximize the usefulness and reusability of our artifact,
 we have tagged, in comments, some of the test cases with notable characteristics. The following can easily be grepped in the test folder:
- * `[FCP-LIM]` is used to indicate a limitation of our FCP implementation relative to MLF. The only current uses of this tag are for (1) programs that requrie generalization at the level of arguments (which is disabled by default but can be enabled with `:GeneralizeArguments`) – see file `shared/src/test/diff/mlf-examples/ex_predicative.mls` – and (2) programs where unions are used in annotations, which is not really supported by SuperF, as explained in the paper – see file `shared/src/test/diff/mlf-examples/ex_shallow.mls`.
+ * `[FCP-LIM]` is used to indicate a limitation of our FCP implementation relative to MLF. The only current uses of this tag are for (1) programs that require generalization at the level of arguments (which is disabled by default but can be enabled with `:GeneralizeArguments`) – see file `shared/src/test/diff/mlf-examples/ex_predicative.mls` – and (2) programs where unions are used in annotations, which is not really supported by SuperF, as explained in the paper – see file `shared/src/test/diff/mlf-examples/ex_shallow.mls`.
  * `[FCP-IMPROV]` shows some notable places where we significantly improve on MLF – but these are by no means meant to be exhaustive nor representative (indeed, many improvements are not explicitly tagged).
- * `[FCP:patho]` is used to tag two knwon pathological cases exposed in the test suite – in both cases, these correspond to programs that are fully unannotated (and thus would simply not work in existing approach) and involve complicated higher-order encodings not really representative of real-world programming patterns.
+ * `[FCP:patho]` is used to tag two known pathological cases exposed in the test suite – in both cases, these correspond to programs that are fully unannotated (and thus would simply not work in the existing approach) and involve complicated higher-order encodings not really representative of real-world programming patterns.
 
 
 
