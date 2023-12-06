@@ -201,9 +201,9 @@ final class TsTypegenCodeBuilder {
         val fieldTypesCode = toTypegenInheritedFields(fieldTypes)
         (SourceCode(fieldVar.name), fieldTypesCode)
       }
-      .foreach({ case (fieldVar, fieldType) => {
+      .foreachEntry { case (fieldVar, fieldType) =>
         classDeclaration += SourceCode("    ") ++ fieldVar ++ SourceCode.colon ++ fieldType
-      }})
+      }
 
     // constructor needs all fields including super classes
     val allFieldsAndTypes = (classFieldsAndType ++

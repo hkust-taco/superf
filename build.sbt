@@ -2,7 +2,7 @@ import Wart._
 
 enablePlugins(ScalaJSPlugin)
 
-ThisBuild / scalaVersion     := "2.13.9"
+ThisBuild / scalaVersion     := "2.13.12"
 ThisBuild / version          := "0.1.0-SNAPSHOT"
 ThisBuild / organization     := "io.lptk"
 ThisBuild / organizationName := "LPTK"
@@ -36,7 +36,8 @@ lazy val mlscript = crossProject(JSPlatform, JVMPlatform).in(file("."))
       StringPlusAny, Any, ToString,
       JavaSerializable, Serializable, Product, ToString,
       LeakingSealed, Overloading,
-      Option2Iterable, IterableOps, ListAppend
+      Option2Iterable, IterableOps, ListAppend, SeqApply,
+      TripleQuestionMark,
     ),
     libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.12" % Test,
     libraryDependencies += "com.lihaoyi" %%% "sourcecode" % "0.3.0",

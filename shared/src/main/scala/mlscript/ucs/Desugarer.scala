@@ -554,7 +554,7 @@ class Desugarer extends TypeDefs { self: Typer =>
             if (patternMap.isEmpty)
               printlnUCS("<Empty>")
             else
-              patternMap.foreach { case (key, mutCase) => printlnUCS(s"- $key => $mutCase")}
+              patternMap.foreachEntry { case (key, mutCase) => printlnUCS(s"- $key => $mutCase")}
             // Filter out missing cases in `branches`.
             val missingCases = patternMap.removedAll(branches.iterator.map {
               case MutCase(classNameVar -> _, _) => classNameVar
@@ -609,7 +609,7 @@ class Desugarer extends TypeDefs { self: Typer =>
     }
     rec(t)
     printlnUCS("Exhaustiveness map")
-    m.foreach { case (scrutinee, patterns) =>
+    m.foreachEntry { case (scrutinee, patterns) =>
       printlnUCS(s"- $scrutinee => " + patterns.keys.mkString(", "))
     }
     Map.from(m.iterator.map { case (key, patternMap) => key -> Map.from(patternMap) })
