@@ -1,7 +1,3 @@
-
-:NoConstrainedTypes
-:DontDistributeForalls
-:NoCycleCheck
 :NoRecursiveTypes
 
 
@@ -70,7 +66,7 @@ def cons: 'a -> List['a] -> List['a]
 def cons head tail = Cons { head; tail }
 //│ cons: 'a -> List['a] -> List['a]
 //│     = <missing implementation>
-//│ 'b -> (forall 'a 'tail. (List['a] & 'tail) -> (Cons['a | 'b] with {head: 'b, tail: 'tail}))
+//│ ('head & 'a) -> (List['a] & 'tail) -> (Cons['a] with {head: 'head, tail: 'tail})
 //│   <:  cons:
 //│ 'a -> List['a] -> List['a]
 //│     = [Function: cons]
@@ -115,6 +111,15 @@ rec def length l =
 //│ List[?] -> int
 //│       = [Function: length]
 
+def const: 'a -> 'b -> 'a
+def const x y = x
+//│ const: 'a -> anything -> 'a
+//│      = <missing implementation>
+//│ 'a -> anything -> 'a
+//│   <:  const:
+//│ 'a -> anything -> 'a
+//│      = [Function: const1]
+
 def id: 'a -> 'a
 def id x = x
 //│ id: 'a -> 'a
@@ -146,7 +151,7 @@ def choose: 'a -> 'a -> 'a
 def choose x y = if true then x else y
 //│ choose: 'a -> 'a -> 'a
 //│       = <missing implementation>
-//│ 'a -> (forall 'b. 'b -> ('a | 'b))
+//│ 'a -> 'a -> 'a
 //│   <:  choose:
 //│ 'a -> 'a -> 'a
 //│       = [Function: choose]
@@ -169,14 +174,14 @@ def auto x = x x
 //│ (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
 //│     = [Function: auto]
 
-def auto_ : (forall 'a. 'a -> 'a) -> 'b -> 'b
-def auto_ x = x x
-//│ auto_: (forall 'a. 'a -> 'a) -> 'b -> 'b
+def auto' : (forall 'a. 'a -> 'a) -> 'b -> 'b
+def auto' x = x x
+//│ auto': (forall 'a. 'a -> 'a) -> 'b -> 'b
 //│      = <missing implementation>
 //│ ('a -> 'b & 'a) -> 'b
-//│   <:  auto_:
+//│   <:  auto':
 //│ (forall 'a. 'a -> 'a) -> 'b -> 'b
-//│      = [Function: auto_]
+//│      = [Function: auto$]
 
 def map: ('a -> 'b) -> List['a] -> List['b]
 rec def map f l =
@@ -202,7 +207,7 @@ def revapp: 'a -> ('a -> 'b) -> 'b
 def revapp x f = f x
 //│ revapp: 'a -> ('a -> 'b) -> 'b
 //│       = <missing implementation>
-//│ 'a -> (forall 'b. ('a -> 'b) -> 'b)
+//│ 'a -> ('a -> 'b) -> 'b
 //│   <:  revapp:
 //│ 'a -> ('a -> 'b) -> 'b
 //│       = [Function: revapp]
@@ -237,7 +242,7 @@ def lst: List[forall 'a. int -> 'a -> 'a]
 // E3
 :ng
 def r: (forall 'a. 'a -> (forall 'b. 'b -> 'b)) -> int
-//│ r: (anything -> (forall 'b. 'b -> 'b)) -> int
+//│ r: (forall 'b. anything -> 'b -> 'b) -> int
 
 
 type ChurchInt = forall 'N. ('N -> 'N) -> ('N -> 'N)
@@ -259,7 +264,7 @@ def zero: ChurchInt
 def zero f x = x
 //│ zero: ChurchInt
 //│     = <missing implementation>
-//│ anything -> (forall 'a. 'a -> 'a)
+//│ anything -> 'a -> 'a
 //│   <:  zero:
 //│ ChurchInt
 //│     = [Function: zero]
@@ -268,7 +273,7 @@ def succ: (forall 'N. ('N -> 'N) -> ('N -> 'N)) -> (forall 'M. ('M -> 'M) -> ('M
 def succ (n: ChurchInt) f x = f (n f x)
 //│ succ: (forall 'N. ('N -> 'N) -> 'N -> 'N) -> (forall 'M. ('M -> 'M) -> 'M -> 'M)
 //│     = <missing implementation>
-//│ ChurchInt -> (forall 'N 'N0 'a. ('N -> ('N & 'N0) & 'N0 -> 'a) -> ('N & 'N0) -> 'a)
+//│ ChurchInt -> ('N -> ('N & 'a)) -> 'N -> 'a
 //│   <:  succ:
 //│ (forall 'N. ('N -> 'N) -> 'N -> 'N) -> (forall 'M. ('M -> 'M) -> 'M -> 'M)
 //│     = [Function: succ1]
@@ -276,9 +281,13 @@ def succ (n: ChurchInt) f x = f (n f x)
 
 
 
-// ================================================================
-// ======================== Vanilla SuperF ========================
-// ================================================================
+// ===============================================================
+// ========================== SuperF -D ==========================
+// ===============================================================
+
+// SuperF without distributivity
+
+:DontDistributeForalls
 
 
 // ============ A. polymorphic instantiation ============
@@ -309,9 +318,9 @@ id auto
 //│    = [Function: auto]
 
 // A6
-id auto_
+id auto'
 //│ res: (forall 'a. 'a -> 'a) -> 'b -> 'b
-//│    = [Function: auto_]
+//│    = [Function: auto$]
 
 // A7
 choose id auto
@@ -319,7 +328,7 @@ choose id auto
 //│    = [Function: id1]
 
 // A8
-choose id auto_
+choose id auto'
 //│ res: (forall 'a. 'a -> 'a & 'a0) -> ('a0 | 'b -> 'b)
 //│    = [Function: id1]
 
@@ -496,7 +505,7 @@ let f = revapp id in f poly
 //│    = [ 1, true ]
 
 // F10
-choose id (fun x -> auto_ x)
+choose id (fun x -> auto' x)
 //│ res: (forall 'a. 'a -> 'a & 'a0) -> ('a0 | 'b -> 'b)
 //│    = [Function: id1]
 
@@ -527,20 +536,20 @@ z: ChurchInt
 // G2A
 s: ChurchInt -> ChurchInt
 //│ ╔══[ERROR] Type error in type ascription
-//│ ║  l.528: 	s: ChurchInt -> ChurchInt
+//│ ║  l.540: 	s: ChurchInt -> ChurchInt
 //│ ║         	^
 //│ ╟── type variable `'N` leaks out of its scope
-//│ ║  l.243: 	type ChurchInt = forall 'N. ('N -> 'N) -> ('N -> 'N)
+//│ ║  l.251: 	type ChurchInt = forall 'N. ('N -> 'N) -> ('N -> 'N)
 //│ ║         	                                   ^^
 //│ ╟── back into type variable `'N`
-//│ ║  l.243: 	type ChurchInt = forall 'N. ('N -> 'N) -> ('N -> 'N)
+//│ ║  l.251: 	type ChurchInt = forall 'N. ('N -> 'N) -> ('N -> 'N)
 //│ ║         	                             ^^
 //│ ╟── adding a type annotation to any of the following terms may help resolve the problem
 //│ ╟── • this function:
-//│ ║  l.512: 	def s n f x = f (n f x)
+//│ ║  l.524: 	def s n f x = f (n f x)
 //│ ║         	        ^^^^^^^^^^^^^^^
 //│ ╟── • this reference:
-//│ ║  l.528: 	s: ChurchInt -> ChurchInt
+//│ ║  l.540: 	s: ChurchInt -> ChurchInt
 //│ ╙──       	^
 //│ res: ChurchInt -> ChurchInt
 //│    = [Function: s]
@@ -550,54 +559,81 @@ n3: ChurchInt
 //│ res: ChurchInt
 //│    = [Function (anonymous)]
 
-// G4
+:e
+// G4A
+(fun () -> n3 n3) : () -> ChurchInt
+//│ ╔══[ERROR] Type error in type ascription
+//│ ║  l.567: 	(fun () -> n3 n3) : () -> ChurchInt
+//│ ║         	^^^^^^^^^^^^^^^^^
+//│ ╟── type variable `'N` leaks out of its scope
+//│ ║  l.251: 	type ChurchInt = forall 'N. ('N -> 'N) -> ('N -> 'N)
+//│ ║         	                                   ^^
+//│ ╟── back into type variable `'N`
+//│ ║  l.251: 	type ChurchInt = forall 'N. ('N -> 'N) -> ('N -> 'N)
+//│ ║         	                             ^^
+//│ ╟── adding a type annotation to any of the following terms may help resolve the problem
+//│ ╟── • this function:
+//│ ║  l.524: 	def s n f x = f (n f x)
+//│ ║         	          ^^^^^^^^^^^^^
+//│ ╟── • this application:
+//│ ║  l.567: 	(fun () -> n3 n3) : () -> ChurchInt
+//│ ║         	           ^^^^^
+//│ ╟── Note: constraint arises from application:
+//│ ║  l.524: 	def s n f x = f (n f x)
+//│ ╙──       	              ^^^^^^^^^
+//│ res: () -> ChurchInt
+//│    = [Function: res]
+
+// G5
 fst (fst (fst (n3 (fun x -> (x, 0)) 1)))
 //│ res: 1
 //│    = 1
 
+// G6
 (succ (succ zero)) (succ (succ zero))
 //│ res: ('M -> 'M) -> 'M -> 'M
 //│    = [Function (anonymous)]
 
+// G7
 (s (s z)) (s (s z))
 //│ res: ('a -> ('a & 'b) & 'b -> ('a & 'b & 'c)) -> 'a -> 'c
 //│    = [Function (anonymous)]
 
-// G7
+// G8
 rec def to_ch n = if n == 0 then z else s (to_ch (n - 1))
 //│ to_ch: int -> (forall 'a. ('b -> 'a & 'b -> 'b) -> (forall 'c. ('b & 'c) -> ('c | 'a)))
 //│      = [Function: to_ch]
 
 :e
-// G7A
+// G8A
 to_ch: int -> ChurchInt
 //│ ╔══[ERROR] Type error in type ascription
-//│ ║  l.573: 	to_ch: int -> ChurchInt
+//│ ║  l.612: 	to_ch: int -> ChurchInt
 //│ ║         	^^^^^
 //│ ╟── type variable `'N` leaks out of its scope
-//│ ║  l.243: 	type ChurchInt = forall 'N. ('N -> 'N) -> ('N -> 'N)
+//│ ║  l.251: 	type ChurchInt = forall 'N. ('N -> 'N) -> ('N -> 'N)
 //│ ║         	                                   ^^
 //│ ╟── back into type variable `'N`
-//│ ║  l.243: 	type ChurchInt = forall 'N. ('N -> 'N) -> ('N -> 'N)
+//│ ║  l.251: 	type ChurchInt = forall 'N. ('N -> 'N) -> ('N -> 'N)
 //│ ║         	                             ^^
 //│ ╟── adding a type annotation to any of the following terms may help resolve the problem
 //│ ╟── • this function:
-//│ ║  l.512: 	def s n f x = f (n f x)
+//│ ║  l.524: 	def s n f x = f (n f x)
 //│ ║         	        ^^^^^^^^^^^^^^^
 //│ ╟── • this application:
-//│ ║  l.567: 	rec def to_ch n = if n == 0 then z else s (to_ch (n - 1))
+//│ ║  l.606: 	rec def to_ch n = if n == 0 then z else s (to_ch (n - 1))
 //│ ║         	                                        ^^^^^^^^^^^^^^^^^
 //│ ╟── • this reference:
-//│ ║  l.573: 	to_ch: int -> ChurchInt
+//│ ║  l.612: 	to_ch: int -> ChurchInt
 //│ ║         	^^^^^
 //│ ╟── Note: constraint arises from application:
-//│ ║  l.512: 	def s n f x = f (n f x)
+//│ ║  l.524: 	def s n f x = f (n f x)
 //│ ╙──       	              ^^^^^^^^^
 //│ res: int -> ChurchInt
 //│    = [Function: to_ch]
 
 :e
-// G8
+// G9
 rec def id1 x = if true then x else id1 id1 x
 //│ ╔══[ERROR] Inferred recursive type: 'a
 //│   where
@@ -606,10 +642,10 @@ rec def id1 x = if true then x else id1 id1 x
 //│        <: 'c
 //│     'c :> 'b -> 'c
 //│        <: 'a
-//│ ║  l.601: 	rec def id1 x = if true then x else id1 id1 x
+//│ ║  l.640: 	rec def id1 x = if true then x else id1 id1 x
 //│ ╙──       	                                    ^^^^^^^
-//│ ╔══[ERROR] Subtyping constraint of the form `?a -> ?b <: ?id1` exceeded recursion depth limit (250)
-//│ ║  l.601: 	rec def id1 x = if true then x else id1 id1 x
+//│ ╔══[ERROR] Cyclic-looking constraint while typing binding of lambda expression; a type annotation may be required
+//│ ║  l.640: 	rec def id1 x = if true then x else id1 id1 x
 //│ ║         	            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //│ ╙── Note: use flag `:ex` to see internal error info.
 //│ id1: 'id1
@@ -622,81 +658,39 @@ rec def id1 x = if true then x else id1 id1 x
 //│    = [Function: id11]
 
 :e
-// G9
+// G9'
 id1 id1
 //│ ╔══[ERROR] Inferred recursive type: 'a
 //│   where
 //│     'a :> forall 'b 'c. ('d & 'b) -> ('a | 'c)
 //│        <: 'd -> 'a
 //│     'd :> forall 'b 'c. ('d & 'b) -> ('a | 'c)
-//│        <: 'a & 'e
-//│     'e :> forall 'b 'c. ('b & 'e) -> ('c | 'f)
-//│        <: 'f & 'g
-//│     'g :> forall 'b 'c. ('b & 'g) -> ('c | 'h)
-//│        <: 'h & 'i
-//│     'i :> forall 'b 'c. ('b & 'i) -> ('c | 'j)
-//│        <: 'j & 'k
-//│     'k :> forall 'b 'c. ('b & 'k) -> ('c | 'l)
-//│        <: 'l & 'm
-//│     'm :> forall 'b 'c. ('b & 'm) -> ('c | 'n)
-//│        <: 'n & 'o
-//│     'o :> forall 'b 'c. ('b & 'o) -> ('c | 'p)
-//│        <: 'p & 'q
-//│     'q :> forall 'b 'c. ('b & 'q) -> ('c | 'r)
-//│        <: 'r & 's
-//│     's :> 's -> 't
-//│        <: 't
-//│     't := 's -> 't
-//│     'r :> forall 'b 'c. ('b & 'q) -> ('c | 'r)
-//│        <: 'q -> 'r
-//│     'p :> forall 'b 'c. ('b & 'o) -> ('c | 'p)
-//│        <: 'o -> 'p
-//│     'n :> forall 'b 'c. ('b & 'm) -> ('c | 'n)
-//│        <: 'm -> 'n
-//│     'l :> forall 'b 'c. ('b & 'k) -> ('c | 'l)
-//│        <: 'k -> 'l
-//│     'j :> forall 'b 'c. ('b & 'i) -> ('c | 'j)
-//│        <: 'i -> 'j
-//│     'h :> forall 'b 'c. ('b & 'g) -> ('c | 'h)
-//│        <: 'g -> 'h
-//│     'f :> forall 'b 'c. ('b & 'e) -> ('c | 'f)
-//│        <: 'e -> 'f
+//│        <: 'a & 'e & 'f
+//│     'f :> ('d & 'f) -> ('a | 'g)
+//│        <: 'd & 'g
+//│     'g :> ('d & 'f) -> ('a | 'g)
+//│        <: 'f -> 'g
+//│     'e :> ('d & 'e) -> ('a | 'h)
+//│        <: 'd & 'h
+//│     'h :> ('d & 'e) -> ('a | 'h)
+//│        <: 'e -> 'h
 //│     'b :> 'b -> 'c
 //│        <: 'c
 //│     'c := 'b -> 'c
-//│ ║  l.601: 	rec def id1 x = if true then x else id1 id1 x
+//│ ║  l.640: 	rec def id1 x = if true then x else id1 id1 x
 //│ ╙──       	                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
-//│ ╔══[ERROR] Subtyping constraint of the form `forall ?a ?b ?c ?d ?e ?id1. ?id1 <: (forall ?f ?g ?id10 ?h ?i ?j. ?id10) -> ?k` exceeded recursion depth limit (250)
-//│ ║  l.626: 	id1 id1
+//│ ╔══[ERROR] Cyclic-looking constraint while typing application; a type annotation may be required
+//│ ║  l.665: 	id1 id1
 //│ ║         	^^^^^^^
 //│ ╙── Note: use flag `:ex` to see internal error info.
 //│ res: error
 //│    = [Function: id11]
 
-// Gn
 :e
-auto auto
-//│ ╔══[ERROR] Type mismatch in application:
-//│ ║  l.678: 	auto auto
-//│ ║         	^^^^^^^^^
-//│ ╟── type `'a` is not a function
-//│ ║  l.163: 	def auto : (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
-//│ ║         	                       ^^
-//│ ╟── Note: constraint arises from function type:
-//│ ║  l.163: 	def auto : (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
-//│ ║         	                       ^^^^^^^^
-//│ ╟── Note: quantified type variable 'a is defined at:
-//│ ║  l.163: 	def auto : (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
-//│ ╙──       	                   ^^
-//│ res: 'b -> 'b | error
-//│ Runtime error:
-//│   RangeError: Maximum call stack size exceeded
-
-// Gn+1
-:e
+// G10
 (fun x -> x x) (fun x -> x x)
-//│ ╔══[ERROR] Subtyping constraint of the form `?a -> ?b <: (forall ?c ?d. ?c -> ?d) -> ?e` exceeded recursion depth limit (250)
-//│ ║  l.697: 	(fun x -> x x) (fun x -> x x)
+//│ ╔══[ERROR] Cyclic-looking constraint while typing application; a type annotation may be required
+//│ ║  l.694: 	(fun x -> x x) (fun x -> x x)
 //│ ║         	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //│ ╙── Note: use flag `:ex` to see internal error info.
 //│ res: error
@@ -705,7 +699,7 @@ auto auto
 
 :e
 :re
-// Gn+2
+// G10' – using forced instantiation with `!`
 (fun x -> x x) (fun x -> x x)!
 //│ ╔══[ERROR] Inferred recursive type: 'a
 //│   where
@@ -716,11 +710,46 @@ auto auto
 //│ Runtime error:
 //│   RangeError: Maximum call stack size exceeded
 
+:e
+// G11
+auto (auto' id)
+//│ ╔══[ERROR] Type error in application
+//│ ║  l.718: 	auto (auto' id)
+//│ ║         	^^^^^^^^^^^^^^^
+//│ ╟── type variable `'a` leaks out of its scope
+//│ ║  l.171: 	def auto : (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
+//│ ║         	                       ^^
+//│ ╟── back into type variable `'a`
+//│ ║  l.171: 	def auto : (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
+//│ ╙──       	                             ^^
+//│ res: 'b -> 'b | error
+//│    = [Function: id1]
+
+// G12
+(fun y -> (let tmp = y id in y const)) (fun x -> x x)
+//│ res: anything -> (forall 'a. 'a -> anything -> 'a)
+//│    = [Function (anonymous)]
+
+// G13
+(fun k -> (k (fun x -> x), k (fun x -> single x))) (fun f -> (f 1, f true))
+//│ res: ((1, true,), (List[1], List[true],),)
+//│    = [
+//│        [ 1, true ],
+//│        [ Cons { head: 1, tail: Nil {} }, Cons { head: true, tail: Nil {} } ]
+//│      ]
+
+// G14
+(fun f -> let a() = f id in a() : int -> (forall 'b. 'b -> 'b)) (const (const id))
+//│ res: int -> (forall 'b. 'b -> 'b)
+//│    = [Function (anonymous)]
 
 
-// ===========================================================
-// ======================== SuperF +D ========================
-// ===========================================================
+
+// ===============================================================
+// ========================== SuperF +D ==========================
+// ===============================================================
+
+// SuperF (with distributivity)
 
 :DistributeForalls
 
@@ -753,9 +782,9 @@ id auto
 //│    = [Function: auto]
 
 // A6
-id auto_
+id auto'
 //│ res: (forall 'a. 'a -> 'a) -> 'b -> 'b
-//│    = [Function: auto_]
+//│    = [Function: auto$]
 
 // A7
 choose id auto
@@ -763,7 +792,7 @@ choose id auto
 //│    = [Function: id1]
 
 // A8
-choose id auto_
+choose id auto'
 //│ res: (forall 'a. 'a -> 'a & 'a0) -> ('a0 | 'b -> 'b)
 //│    = [Function: id1]
 
@@ -940,7 +969,7 @@ let f = revapp id in f poly
 //│    = [ 1, true ]
 
 // F10
-choose id (fun x -> auto_ x)
+choose id (fun x -> auto' x)
 //│ res: (forall 'a. 'a -> 'a & 'a0) -> ('a0 | 'b -> 'b)
 //│    = [Function: id1]
 
@@ -977,31 +1006,38 @@ n3: ChurchInt
 //│ res: ChurchInt
 //│    = [Function (anonymous)]
 
-// G4
+// G4A
+(fun () -> n3 n3) : () -> ChurchInt
+//│ res: () -> ChurchInt
+//│    = [Function: res]
+
+// G5
 fst (fst (fst (n3 (fun x -> (x, 0)) 1)))
 //│ res: 1
 //│    = 1
 
+// G6
 (succ (succ zero)) (succ (succ zero))
 //│ res: ('M -> 'M) -> 'M -> 'M
 //│    = [Function (anonymous)]
 
+// G7
 (s (s z)) (s (s z))
 //│ res: ('a -> ('a & 'b & 'c) & 'c -> ('a & 'c)) -> 'c -> 'b
 //│    = [Function (anonymous)]
 
-// G7
+// G8
 rec def to_ch n = if n == 0 then z else s (to_ch (n - 1))
 //│ to_ch: int -> ('a -> ('a & 'b)) -> ('a & 'b) -> 'b
 //│      = [Function: to_ch1]
 
-// G7A
+// G8A
 to_ch: int -> ChurchInt
 //│ res: int -> ChurchInt
 //│    = [Function: to_ch1]
 
 :e
-// G8
+// G9
 rec def id1 x = if true then x else id1 id1 x
 //│ ╔══[ERROR] Inferred recursive type: 'a
 //│   where
@@ -1010,10 +1046,10 @@ rec def id1 x = if true then x else id1 id1 x
 //│        <: 'c
 //│     'c :> 'b -> 'c
 //│        <: 'a
-//│ ║  l.1005: 	rec def id1 x = if true then x else id1 id1 x
+//│ ║  l.1044: 	rec def id1 x = if true then x else id1 id1 x
 //│ ╙──        	                                    ^^^^^^^
-//│ ╔══[ERROR] Subtyping constraint of the form `?a -> ?b <: ?id1` exceeded recursion depth limit (250)
-//│ ║  l.1005: 	rec def id1 x = if true then x else id1 id1 x
+//│ ╔══[ERROR] Cyclic-looking constraint while typing binding of lambda expression; a type annotation may be required
+//│ ║  l.1044: 	rec def id1 x = if true then x else id1 id1 x
 //│ ║          	            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //│ ╙── Note: use flag `:ex` to see internal error info.
 //│ id1: 'id1
@@ -1026,81 +1062,39 @@ rec def id1 x = if true then x else id1 id1 x
 //│    = [Function: id12]
 
 :e
-// G9
+// G9'
 id1 id1
 //│ ╔══[ERROR] Inferred recursive type: 'a
 //│   where
 //│     'a :> forall 'b 'c. ('d & 'b) -> ('a | 'c)
 //│        <: 'd -> 'a
 //│     'd :> forall 'b 'c. ('d & 'b) -> ('a | 'c)
-//│        <: 'a & 'e
-//│     'e :> forall 'b 'c. ('b & 'e) -> ('c | 'f)
-//│        <: 'f & 'g
-//│     'g :> forall 'b 'c. ('b & 'g) -> ('c | 'h)
-//│        <: 'h & 'i
-//│     'i :> forall 'b 'c. ('b & 'i) -> ('c | 'j)
-//│        <: 'j & 'k
-//│     'k :> forall 'b 'c. ('b & 'k) -> ('c | 'l)
-//│        <: 'l & 'm
-//│     'm :> forall 'b 'c. ('b & 'm) -> ('c | 'n)
-//│        <: 'n & 'o
-//│     'o :> forall 'b 'c. ('b & 'o) -> ('c | 'p)
-//│        <: 'p & 'q
-//│     'q :> forall 'b 'c. ('b & 'q) -> ('c | 'r)
-//│        <: 'r & 's
-//│     's :> 's -> 't
-//│        <: 't
-//│     't := 's -> 't
-//│     'r :> forall 'b 'c. ('b & 'q) -> ('c | 'r)
-//│        <: 'q -> 'r
-//│     'p :> forall 'b 'c. ('b & 'o) -> ('c | 'p)
-//│        <: 'o -> 'p
-//│     'n :> forall 'b 'c. ('b & 'm) -> ('c | 'n)
-//│        <: 'm -> 'n
-//│     'l :> forall 'b 'c. ('b & 'k) -> ('c | 'l)
-//│        <: 'k -> 'l
-//│     'j :> forall 'b 'c. ('b & 'i) -> ('c | 'j)
-//│        <: 'i -> 'j
-//│     'h :> forall 'b 'c. ('b & 'g) -> ('c | 'h)
-//│        <: 'g -> 'h
-//│     'f :> forall 'b 'c. ('b & 'e) -> ('c | 'f)
-//│        <: 'e -> 'f
+//│        <: 'a & 'e & 'f
+//│     'f :> ('d & 'f) -> ('a | 'g)
+//│        <: 'd & 'g
+//│     'g :> ('d & 'f) -> ('a | 'g)
+//│        <: 'f -> 'g
+//│     'e :> ('d & 'e) -> ('a | 'h)
+//│        <: 'd & 'h
+//│     'h :> ('d & 'e) -> ('a | 'h)
+//│        <: 'e -> 'h
 //│     'b :> 'b -> 'c
 //│        <: 'c
 //│     'c := 'b -> 'c
-//│ ║  l.1005: 	rec def id1 x = if true then x else id1 id1 x
+//│ ║  l.1044: 	rec def id1 x = if true then x else id1 id1 x
 //│ ╙──        	                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
-//│ ╔══[ERROR] Subtyping constraint of the form `forall ?a ?id1 ?b ?c ?d ?e. ?id1 <: (forall ?f ?g ?id10 ?h ?i ?j. ?id10) -> ?k` exceeded recursion depth limit (250)
-//│ ║  l.1030: 	id1 id1
+//│ ╔══[ERROR] Cyclic-looking constraint while typing application; a type annotation may be required
+//│ ║  l.1069: 	id1 id1
 //│ ║          	^^^^^^^
 //│ ╙── Note: use flag `:ex` to see internal error info.
 //│ res: error
 //│    = [Function: id12]
 
-// Gn
 :e
-auto auto
-//│ ╔══[ERROR] Type mismatch in application:
-//│ ║  l.1082: 	auto auto
-//│ ║          	^^^^^^^^^
-//│ ╟── type `'a` is not a function
-//│ ║  l.163: 	def auto : (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
-//│ ║         	                       ^^
-//│ ╟── Note: constraint arises from function type:
-//│ ║  l.163: 	def auto : (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
-//│ ║         	                       ^^^^^^^^
-//│ ╟── Note: quantified type variable 'a is defined at:
-//│ ║  l.163: 	def auto : (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
-//│ ╙──       	                   ^^
-//│ res: 'b -> 'b | error
-//│ Runtime error:
-//│   RangeError: Maximum call stack size exceeded
-
-// Gn+1
-:e
+// G10
 (fun x -> x x) (fun x -> x x)
-//│ ╔══[ERROR] Subtyping constraint of the form `?a -> ?b <: (forall ?c ?d. ?c -> ?d) -> ?e` exceeded recursion depth limit (250)
-//│ ║  l.1101: 	(fun x -> x x) (fun x -> x x)
+//│ ╔══[ERROR] Cyclic-looking constraint while typing application; a type annotation may be required
+//│ ║  l.1098: 	(fun x -> x x) (fun x -> x x)
 //│ ║          	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //│ ╙── Note: use flag `:ex` to see internal error info.
 //│ res: error
@@ -1109,7 +1103,7 @@ auto auto
 
 :e
 :re
-// Gn+2
+// G10' – using forced instantiation with `!`
 (fun x -> x x) (fun x -> x x)!
 //│ ╔══[ERROR] Inferred recursive type: 'a
 //│   where
@@ -1120,13 +1114,55 @@ auto auto
 //│ Runtime error:
 //│   RangeError: Maximum call stack size exceeded
 
+// G11
+auto (auto' id)
+//│ res: 'b -> 'b
+//│    = [Function: id1]
+
+// G12
+(fun y -> (let tmp = y id in y const)) (fun x -> x x)
+//│ res: anything -> 'a -> anything -> 'a
+//│    = [Function (anonymous)]
+
+// G13
+(fun k -> (k (fun x -> x), k (fun x -> single x))) (fun f -> (f 1, f true))
+//│ res: ((1, true,), (List[1], List[true],),)
+//│    = [
+//│        [ 1, true ],
+//│        [ Cons { head: 1, tail: Nil {} }, Cons { head: true, tail: Nil {} } ]
+//│      ]
+
+:e // The only example in this file where distributivity makes things worse
+// G14
+(fun f -> let a() = f id in a() : int -> (forall 'b. 'b -> 'b)) (const (const id))
+//│ ╔══[ERROR] Type error in application
+//│ ║  l.1140: 	(fun f -> let a() = f id in a() : int -> (forall 'b. 'b -> 'b)) (const (const id))
+//│ ║          	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+//│ ╟── type variable `'b` leaks out of its scope
+//│ ║  l.1140: 	(fun f -> let a() = f id in a() : int -> (forall 'b. 'b -> 'b)) (const (const id))
+//│ ║          	                                                     ^^
+//│ ╟── back into type variable `'b`
+//│ ║  l.1140: 	(fun f -> let a() = f id in a() : int -> (forall 'b. 'b -> 'b)) (const (const id))
+//│ ║          	                                                           ^^
+//│ ╟── adding a type annotation to any of the following terms may help resolve the problem
+//│ ╟── • this application:
+//│ ║  l.1140: 	(fun f -> let a() = f id in a() : int -> (forall 'b. 'b -> 'b)) (const (const id))
+//│ ║          	                    ^^^^
+//│ ╟── • this application:
+//│ ║  l.1140: 	(fun f -> let a() = f id in a() : int -> (forall 'b. 'b -> 'b)) (const (const id))
+//│ ╙──        	                            ^^^
+//│ res: int -> (forall 'b. 'b -> 'b) | error
+//│    = [Function (anonymous)]
 
 
-// ==============================================================
-// ======================== SuperF +D+CC ========================
-// ==============================================================
 
-:CycleCheck
+// ===============================================================
+// ======================== SuperF +D+RT =========================
+// ===============================================================
+
+// SuperF with cycle checker, with distributivity, and with recursive types
+
+:RecursiveTypes
 
 
 // ============ A. polymorphic instantiation ============
@@ -1157,9 +1193,9 @@ id auto
 //│    = [Function: auto]
 
 // A6
-id auto_
+id auto'
 //│ res: (forall 'a. 'a -> 'a) -> 'b -> 'b
-//│    = [Function: auto_]
+//│    = [Function: auto$]
 
 // A7
 choose id auto
@@ -1167,7 +1203,7 @@ choose id auto
 //│    = [Function: id1]
 
 // A8
-choose id auto_
+choose id auto'
 //│ res: (forall 'a. 'a -> 'a & 'a0) -> ('a0 | 'b -> 'b)
 //│    = [Function: id1]
 
@@ -1344,7 +1380,7 @@ let f = revapp id in f poly
 //│    = [ 1, true ]
 
 // F10
-choose id (fun x -> auto_ x)
+choose id (fun x -> auto' x)
 //│ res: (forall 'a. 'a -> 'a & 'a0) -> ('a0 | 'b -> 'b)
 //│    = [Function: id1]
 
@@ -1381,45 +1417,38 @@ n3: ChurchInt
 //│ res: ChurchInt
 //│    = [Function (anonymous)]
 
-// G4
+// G4A
+(fun () -> n3 n3) : () -> ChurchInt
+//│ res: () -> ChurchInt
+//│    = [Function: res]
+
+// G5
 fst (fst (fst (n3 (fun x -> (x, 0)) 1)))
 //│ res: 1
 //│    = 1
 
+// G6
 (succ (succ zero)) (succ (succ zero))
 //│ res: ('M -> 'M) -> 'M -> 'M
 //│    = [Function (anonymous)]
 
+// G7
 (s (s z)) (s (s z))
 //│ res: ('a -> ('a & 'b & 'c) & 'c -> ('a & 'c)) -> 'c -> 'b
 //│    = [Function (anonymous)]
 
-// G7
+// G8
 rec def to_ch n = if n == 0 then z else s (to_ch (n - 1))
 //│ to_ch: int -> ('a -> ('a & 'b)) -> ('a & 'b) -> 'b
 //│      = [Function: to_ch2]
 
-// G7A
+// G8A
 to_ch: int -> ChurchInt
 //│ res: int -> ChurchInt
 //│    = [Function: to_ch2]
 
-:e
-// G8
+// G9
 rec def id1 x = if true then x else id1 id1 x
-//│ ╔══[ERROR] Inferred recursive type: 'a
-//│   where
-//│     'a <: 'b -> 'c
-//│     'b :> 'b -> 'c
-//│        <: 'c
-//│     'c :> 'b -> 'c
-//│        <: 'a
-//│ ║  l.1409: 	rec def id1 x = if true then x else id1 id1 x
-//│ ╙──        	                                    ^^^^^^^
-//│ ╔══[ERROR] Cyclic-looking constraint while typing binding of lambda expression; a type annotation may be required
-//│ ║  l.1409: 	rec def id1 x = if true then x else id1 id1 x
-//│ ║          	            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-//│ ╙── Note: use flag `:ex` to see internal error info.
 //│ id1: 'id1
 //│   where
 //│     'id1 :> 'a -> 'b
@@ -1429,374 +1458,7 @@ rec def id1 x = if true then x else id1 id1 x
 //│        <: 'a -> 'b
 //│    = [Function: id13]
 
-:e
-// G9
-id1 id1
-//│ ╔══[ERROR] Inferred recursive type: 'a
-//│   where
-//│     'a :> forall 'b 'c. ('d & 'b) -> ('a | 'c)
-//│        <: 'd -> 'a
-//│     'd :> forall 'b 'c. ('d & 'b) -> ('a | 'c)
-//│        <: 'a & 'e & 'f
-//│     'f :> ('d & 'f) -> ('a | 'g)
-//│        <: 'd & 'g
-//│     'g :> ('d & 'f) -> ('a | 'g)
-//│        <: 'f -> 'g
-//│     'e :> ('d & 'e) -> ('a | 'h)
-//│        <: 'd & 'h
-//│     'h :> ('d & 'e) -> ('a | 'h)
-//│        <: 'e -> 'h
-//│     'b :> 'b -> 'c
-//│        <: 'c
-//│     'c := 'b -> 'c
-//│ ║  l.1409: 	rec def id1 x = if true then x else id1 id1 x
-//│ ╙──        	                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
-//│ ╔══[ERROR] Cyclic-looking constraint while typing application; a type annotation may be required
-//│ ║  l.1434: 	id1 id1
-//│ ║          	^^^^^^^
-//│ ╙── Note: use flag `:ex` to see internal error info.
-//│ res: error
-//│    = [Function: id13]
-
-// Gn
-:e
-auto auto
-//│ ╔══[ERROR] Type mismatch in application:
-//│ ║  l.1463: 	auto auto
-//│ ║          	^^^^^^^^^
-//│ ╟── type `'a` is not a function
-//│ ║  l.163: 	def auto : (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
-//│ ║         	                       ^^
-//│ ╟── Note: constraint arises from function type:
-//│ ║  l.163: 	def auto : (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
-//│ ║         	                       ^^^^^^^^
-//│ ╟── Note: quantified type variable 'a is defined at:
-//│ ║  l.163: 	def auto : (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
-//│ ╙──       	                   ^^
-//│ res: 'b -> 'b | error
-//│ Runtime error:
-//│   RangeError: Maximum call stack size exceeded
-
-// Gn+1
-:e
-(fun x -> x x) (fun x -> x x)
-//│ ╔══[ERROR] Cyclic-looking constraint while typing application; a type annotation may be required
-//│ ║  l.1482: 	(fun x -> x x) (fun x -> x x)
-//│ ║          	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-//│ ╙── Note: use flag `:ex` to see internal error info.
-//│ res: error
-//│ Runtime error:
-//│   RangeError: Maximum call stack size exceeded
-
-:e
-:re
-// Gn+2
-(fun x -> x x) (fun x -> x x)!
-//│ ╔══[ERROR] Inferred recursive type: 'a
-//│   where
-//│     'a :> 'a -> 'b
-//│        <: 'a -> (? & 'b)
-//│ ╙──
-//│ res: nothing
-//│ Runtime error:
-//│   RangeError: Maximum call stack size exceeded
-
-
-
-// =================================================================
-// ======================== SuperF +D+CC+RT ========================
-// =================================================================
-
-:RecursiveTypes
-
-
-// ============ A. polymorphic instantiation ============
-
-// A1
-fun x -> fun y -> y
-//│ res: anything -> 'a -> 'a
-//│    = [Function: res]
-
-// A2
-choose id
-//│ res: 'a -> (forall 'a0. 'a | 'a0 -> 'a0)
-//│    = [Function (anonymous)]
-
-// A3
-choose nil ids
-//│ res: List[forall 'a. 'a -> 'a]
-//│    = Nil {}
-
-// A4
-fun x -> x x
-//│ res: ('a -> 'b & 'a) -> 'b
-//│    = [Function: res]
-
-// A5
-id auto
-//│ res: (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
-//│    = [Function: auto]
-
-// A6
-id auto_
-//│ res: (forall 'a. 'a -> 'a) -> 'b -> 'b
-//│    = [Function: auto_]
-
-// A7
-choose id auto
-//│ res: (forall 'a. 'a -> 'a & 'a0) -> ('a0 | 'b -> 'b)
-//│    = [Function: id1]
-
-// A8
-choose id auto_
-//│ res: (forall 'a. 'a -> 'a & 'a0) -> ('a0 | 'b -> 'b)
-//│    = [Function: id1]
-
-// A9
-:ng
-f (choose id) ids
-//│ res: 'a -> 'a
-
-// A10
-poly id
-//│ res: (int, bool,)
-//│    = [ 1, true ]
-
-// A11
-poly (fun x -> x)
-//│ res: (int, bool,)
-//│    = [ 1, true ]
-
-// A12
-id poly (fun x -> x)
-//│ res: (int, bool,)
-//│    = [ 1, true ]
-
-
-// ============ B. inference of polymorphic arguments ============
-
-// B1
-fun f -> (f 1, f true)
-//│ res: (1 -> 'a & true -> 'b) -> ('a, 'b,)
-//│    = [Function: res]
-
-// B2
-fun xs -> poly (head xs)
-//│ res: List[forall 'a. 'a -> 'a] -> (int, bool,)
-//│    = [Function: res]
-
-
-// ============ C. functions on polymorphic lists ============
-
-// C1
-length ids
-//│ res: int
-//│    = 1
-
-// C2
-tail ids
-//│ res: List[forall 'a. 'a -> 'a]
-//│    = Nil {}
-
-// C3
-head ids
-//│ res: 'a -> 'a
-//│    = [Function: id1]
-
-// C4
-single id
-//│ res: List[forall 'a. 'a -> 'a]
-//│    = Cons { head: [Function: id1], tail: Nil {} }
-
-// C5
-cons id ids
-//│ res: List[forall 'a. 'a -> 'a]
-//│    = Cons {
-//│        head: [Function: id1],
-//│        tail: Cons { head: [Function: id1], tail: Nil {} }
-//│      }
-
-// C6
-cons (fun x -> x) ids
-//│ res: List[forall 'a. 'a -> 'a]
-//│    = Cons {
-//│        head: [Function (anonymous)],
-//│        tail: Cons { head: [Function: id1], tail: Nil {} }
-//│      }
-
-// C7
-append (single inc) (single id)
-//│ res: List[int -> int]
-//│    = Cons {
-//│        head: [Function: succ],
-//│        tail: Cons { head: [Function: id1], tail: Nil {} }
-//│      }
-
-// C8
-:ng
-g (single id) ids
-//│ res: 'a -> 'a
-
-// C9
-map poly (single id)
-//│ res: List[(int, bool,)]
-//│    = Cons { head: [ 1, true ], tail: Nil {} }
-
-// C10
-map head (single ids)
-//│ res: List[forall 'a. 'a -> 'a]
-//│    = Cons { head: [Function: id1], tail: Nil {} }
-
-
-// ============ D. application functions ============
-
-// D1
-app poly id
-//│ res: (int, bool,)
-//│    = [ 1, true ]
-
-// D2
-revapp id poly
-//│ res: (int, bool,)
-//│    = [ 1, true ]
-
-// D3
-:ng
-runST argST
-//│ res: int
-
-// D4
-:ng
-app runST argST
-//│ res: int
-
-// D5
-:ng
-revapp argST runST
-//│ res: int
-
-
-// ============ E. η-expansion ============
-
-// E1
-:ng
-k h lst
-//│ res: int -> 'a -> 'a
-
-// E2
-:ng
-k (fun x -> h x) lst
-//│ res: int -> 'a -> 'a
-
-// E3
-:ng
-r (fun x -> fun y -> y)
-//│ res: int
-
-
-// ============ F. FreezeML Additions ============
-
-// F5
-auto id
-//│ res: 'b -> 'b
-//│    = [Function: id1]
-
-// F6
-cons (head ids) ids
-//│ res: List[forall 'a. 'a -> 'a]
-//│    = Cons {
-//│        head: [Function: id1],
-//│        tail: Cons { head: [Function: id1], tail: Nil {} }
-//│      }
-
-// F7
-(head ids) 3
-//│ res: 3
-//│    = 3
-
-// F8
-choose (head ids)
-//│ res: 'a -> (forall 'a0. 'a | 'a0 -> 'a0)
-//│    = [Function (anonymous)]
-
-// F9
-let f = revapp id in f poly
-//│ res: (int, bool,)
-//│    = [ 1, true ]
-
-// F10
-choose id (fun x -> auto_ x)
-//│ res: (forall 'a. 'a -> 'a & 'a0) -> ('a0 | 'b -> 'b)
-//│    = [Function: id1]
-
-
-// ============ G. SuperF Additions ============
-
-// G1
-def z f x = x
-//│ z: anything -> 'a -> 'a
-//│  = [Function: z3]
-
-// G2
-def s n f x = f (n f x)
-//│ s: ('a -> 'b -> 'c) -> ('c -> 'd & 'a) -> 'b -> 'd
-//│  = [Function: s3]
-
-// G3
-n3 = s (s (s z))
-//│ n3: ('a -> 'b & 'c -> 'a & 'd -> 'c) -> 'd -> 'b
-//│   = [Function (anonymous)]
-
-// G1A
-z: ChurchInt
-//│ res: ChurchInt
-//│    = [Function: z3]
-
-// G2A
-s: ChurchInt -> ChurchInt
-//│ res: ChurchInt -> ChurchInt
-//│    = [Function: s3]
-
-// G3A
-n3: ChurchInt
-//│ res: ChurchInt
-//│    = [Function (anonymous)]
-
-// G4
-fst (fst (fst (n3 (fun x -> (x, 0)) 1)))
-//│ res: 1
-//│    = 1
-
-(succ (succ zero)) (succ (succ zero))
-//│ res: ('M -> 'M) -> 'M -> 'M
-//│    = [Function (anonymous)]
-
-(s (s z)) (s (s z))
-//│ res: ('a -> ('a & 'b & 'c) & 'c -> ('a & 'c)) -> 'c -> 'b
-//│    = [Function (anonymous)]
-
-// G7
-rec def to_ch n = if n == 0 then z else s (to_ch (n - 1))
-//│ to_ch: int -> ('a -> ('a & 'b)) -> ('a & 'b) -> 'b
-//│      = [Function: to_ch3]
-
-// G7A
-to_ch: int -> ChurchInt
-//│ res: int -> ChurchInt
-//│    = [Function: to_ch3]
-
-// G8
-rec def id1 x = if true then x else id1 id1 x
-//│ id1: 'id1
-//│   where
-//│     'id1 :> 'a -> 'b
-//│     'a :> 'id1
-//│        <: 'b
-//│     'b :> 'id1
-//│        <: 'a -> 'b
-//│    = [Function: id14]
-
-// G9
+// G9'
 id1 id1
 //│ res: 'a -> 'b | 'id1
 //│   where
@@ -1809,32 +1471,13 @@ id1 id1
 //│        <: 'd
 //│     'd :> 'id1
 //│        <: 'c -> 'd
-//│    = [Function: id14]
+//│    = [Function: id13]
 
-// Gn
 :e
-auto auto
-//│ ╔══[ERROR] Type mismatch in application:
-//│ ║  l.1816: 	auto auto
-//│ ║          	^^^^^^^^^
-//│ ╟── type `'a` is not a function
-//│ ║  l.163: 	def auto : (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
-//│ ║         	                       ^^
-//│ ╟── Note: constraint arises from function type:
-//│ ║  l.163: 	def auto : (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
-//│ ║         	                       ^^^^^^^^
-//│ ╟── Note: quantified type variable 'a is defined at:
-//│ ║  l.163: 	def auto : (forall 'a. 'a -> 'a) -> (forall 'b. 'b -> 'b)
-//│ ╙──       	                   ^^
-//│ res: 'b -> 'b | error
-//│ Runtime error:
-//│   RangeError: Maximum call stack size exceeded
-
-// Gn+1
-:e
+// G10
 (fun x -> x x) (fun x -> x x)
 //│ ╔══[ERROR] Cyclic-looking constraint while typing application; a type annotation may be required
-//│ ║  l.1835: 	(fun x -> x x) (fun x -> x x)
+//│ ║  l.1481: 	(fun x -> x x) (fun x -> x x)
 //│ ║          	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //│ ╙── Note: use flag `:ex` to see internal error info.
 //│ res: error
@@ -1842,10 +1485,50 @@ auto auto
 //│   RangeError: Maximum call stack size exceeded
 
 :re
-// Gn+2
+// G10' – using forced instantiation with `!`
 (fun x -> x x) (fun x -> x x)!
 //│ res: nothing
 //│ Runtime error:
 //│   RangeError: Maximum call stack size exceeded
+
+// G11
+auto (auto' id)
+//│ res: 'b -> 'b
+//│    = [Function: id1]
+
+// G12
+(fun y -> (let tmp = y id in y const)) (fun x -> x x)
+//│ res: anything -> 'a -> anything -> 'a
+//│    = [Function (anonymous)]
+
+// G13
+(fun k -> (k (fun x -> x), k (fun x -> single x))) (fun f -> (f 1, f true))
+//│ res: ((1, true,), (List[1], List[true],),)
+//│    = [
+//│        [ 1, true ],
+//│        [ Cons { head: 1, tail: Nil {} }, Cons { head: true, tail: Nil {} } ]
+//│      ]
+
+:e
+// G14
+(fun f -> let a() = f id in a() : int -> (forall 'b. 'b -> 'b)) (const (const id))
+//│ ╔══[ERROR] Type error in application
+//│ ║  l.1517: 	(fun f -> let a() = f id in a() : int -> (forall 'b. 'b -> 'b)) (const (const id))
+//│ ║          	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+//│ ╟── type variable `'b` leaks out of its scope
+//│ ║  l.1517: 	(fun f -> let a() = f id in a() : int -> (forall 'b. 'b -> 'b)) (const (const id))
+//│ ║          	                                                     ^^
+//│ ╟── back into type variable `'b`
+//│ ║  l.1517: 	(fun f -> let a() = f id in a() : int -> (forall 'b. 'b -> 'b)) (const (const id))
+//│ ║          	                                                           ^^
+//│ ╟── adding a type annotation to any of the following terms may help resolve the problem
+//│ ╟── • this application:
+//│ ║  l.1517: 	(fun f -> let a() = f id in a() : int -> (forall 'b. 'b -> 'b)) (const (const id))
+//│ ║          	                    ^^^^
+//│ ╟── • this application:
+//│ ║  l.1517: 	(fun f -> let a() = f id in a() : int -> (forall 'b. 'b -> 'b)) (const (const id))
+//│ ╙──        	                            ^^^
+//│ res: int -> (forall 'b. 'b -> 'b) | error
+//│    = [Function (anonymous)]
 
 
