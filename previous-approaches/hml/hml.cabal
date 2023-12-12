@@ -40,6 +40,14 @@ library
 executable hml-exe
   main-is: Main.hs
   other-modules:
+      Gamma
+      InferBasic
+      Operations
+      Parser
+      PPrint
+      Subst
+      Types
+      Unify
       Paths_hml
   autogen-modules:
       Paths_hml
