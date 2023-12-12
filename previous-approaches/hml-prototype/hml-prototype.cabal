@@ -1,0 +1,38 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.35.2.
+--
+-- see: https://github.com/sol/hpack
+
+name:           hml-prototype
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/hml-prototype#readme>
+homepage:       https://github.com/githubuser/hml-prototype#readme
+bug-reports:    https://github.com/githubuser/hml-prototype/issues
+build-type:     Simple
+extra-source-files:
+    readme.txt
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/hml-prototype
+
+executable hml-prototype
+  main-is: Main.hs
+  other-modules:
+      Gamma
+      InferBasic
+      Operations
+      Parser
+      PPrint
+      Subst
+      Types
+      Unify
+      Paths_hml_prototype
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.8 && <5
+    , containers >=0.5
+    , parsec >=3.1
+  default-language: Haskell2010
